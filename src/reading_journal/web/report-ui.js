@@ -282,8 +282,8 @@ function renderFeed() {
       const subject=el('div','event-subject');subject.append(paperLink(event.paper_title,event.resource_link));main.append(kind,subject);
       if(event.category){const category=el('span','badge event-category',event.category);if(validColor(event.color))category.style.setProperty('--annotation-color',event.color);main.append(category);}
       const side=el('div','event-side'),state=el('span','small',`Now: ${event.status_group}`),actions=el('div','event-actions');
-      const paperOpen=eventAction(event.paper_zotero_link||event.zotero_link,'Open paper in Zotero','paper');if(paperOpen)actions.append(paperOpen);
       if(event.type!=='Paper added'){const annotationOpen=eventAction(event.zotero_link,'Open current annotation in Zotero','annotation');if(annotationOpen)actions.append(annotationOpen);}
+      const paperOpen=eventAction(event.paper_zotero_link||event.zotero_link,'Open paper in Zotero','paper');if(paperOpen)actions.append(paperOpen);
       side.append(state);if(actions.childNodes.length)side.append(actions);row.append(time,main,side);list.append(row);
     });section.append(list);host.append(section);
   });

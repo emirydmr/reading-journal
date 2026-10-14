@@ -112,7 +112,9 @@
     .event-subject { line-height: 1.35; }
     .event-category { margin-top: 6px; border-left: 4px solid var(--annotation-color,#aab3af); background: color-mix(in srgb,var(--annotation-color,#aab3af) 15%,white); }
     .event-side { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; min-width: 118px; }
-    .event-actions { display: flex; gap: 6px; }
+    .event-actions { display: grid; grid-template-columns: repeat(2,36px); gap: 6px; }
+    .event-action-annotation { grid-column: 1; }
+    .event-action-paper { grid-column: 2; }
     .event-action { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid #c6d7cb; border-radius: 8px; background: white; color: #245d52; text-decoration: none; }
     .event-action:hover { border-color: #1e7464; background: #f1f7f3; }
     .event-action:focus-visible { outline: 3px solid #9fddc4; outline-offset: 2px; }
