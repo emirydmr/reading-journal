@@ -10,7 +10,6 @@ import secrets
 import threading
 import urllib.parse
 import urllib.request
-import webbrowser
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -190,7 +189,6 @@ def main() -> int:
         json.dump({"port": server.server_port, "token": token}, lock)
         lock.flush()
         url = f"http://127.0.0.1:{server.server_port}/?token={urllib.parse.quote(token)}"
-        threading.Thread(target=webbrowser.open_new_tab, args=(url,), daemon=True).start()
         stopped = threading.Event()
         def serve():
             try:

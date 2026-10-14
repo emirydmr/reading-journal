@@ -202,7 +202,7 @@ function renderStatusSummary() {
   });
 }
 function renderInventory() {
-  const query=$('inventory-search').value.toLocaleLowerCase(),filter=$('inventory-filter').value,sort=$('inventory-sort').value,tag=$('inventory-tag').value;
+  const query=$('inventory-search').value.toLocaleLowerCase(),filter=$('inventory-filter').value,sort=$('inventory-sort').value;
   const visible=visibleData.inventory.filter(paper=>{
     if(query&&![paper.title,...paper.creators].join(' ').toLocaleLowerCase().includes(query))return false;
     if(!matchesTagSelection('inventory-tag',Object.values(paper.tags).flat()))return false;
@@ -243,7 +243,7 @@ function openCollection(keys) {
 }
 
 function renderFeed() {
-  const query=$('feed-search').value.toLocaleLowerCase(),type=$('feed-type').value,collection=$('feed-collection').value,tag=$('feed-tag').value;
+  const query=$('feed-search').value.toLocaleLowerCase(),type=$('feed-type').value,collection=$('feed-collection').value;
   const visible=visibleData.activity.filter(event=>(!type||event.type===type)&&(!collection||event.collections.includes(collection))&&matchesTagSelection('feed-tag',[...Object.values(event.tags).flat(),...(event.annotation_tags||[])])&&(!query||[event.paper_title,...event.creators,event.category||''].join(' ').toLocaleLowerCase().includes(query)));
   $('feed-result').textContent=`${visible.length} of ${visibleData.activity.length} events visible`;const host=$('feed-list');host.replaceChildren();
   if(!visible.length){host.append(el('div','panel empty','No activity matches these filters.'));return;}
@@ -312,7 +312,7 @@ function renderGroupers() {
   });
 }
 function renderJournal() {
-  const query=$('journal-search').value.toLocaleLowerCase(),category=$('journal-category').value,collection=$('journal-collection').value,tag=$('journal-tag').value;
+  const query=$('journal-search').value.toLocaleLowerCase(),category=$('journal-category').value,collection=$('journal-collection').value;
   const visible=visibleData.journal.filter(entry=>(!category||entry.category===category)&&(!collection||entry.collections.includes(collection))&&matchesTagSelection('journal-tag',[...entry.tags,...Object.values(entry.paper_tags).flat()])&&(!query||[entry.paper_title,entry.text,entry.comment,...entry.creators].join(' ').toLocaleLowerCase().includes(query)));
   $('journal-result').textContent=`${visible.length} of ${visibleData.journal.length} annotations visible`;const host=$('journal-list');host.replaceChildren();
   if(!visible.length){host.append(el('div','panel empty','No annotations match these filters.'));return;}

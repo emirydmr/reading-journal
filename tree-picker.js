@@ -17,7 +17,6 @@ function tagTreeNodes(names,basePrefix='') {
 function renderChoiceTree(host,nodes,selected,onChange=()=>{}) {
   host.replaceChildren();const inputs=new Map(),children=new Map(),keys=new Set(nodes.map(node=>node.key));
   nodes.forEach(node=>{const parent=keys.has(node.parent_key)?node.parent_key:null;if(!children.has(parent))children.set(parent,[]);children.get(parent).push(node);});
-  const descendants=key=>(children.get(key)||[]).flatMap(child=>[child.key,...descendants(child.key)]);
   const current=()=>new Set([...inputs].filter(([,input])=>input.checked).map(([key])=>key));
   function branch(node,depth=0){
     const below=children.get(node.key)||[],box=el(below.length?'details':'div',below.length?'choice-branch':'choice-leaf');

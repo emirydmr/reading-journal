@@ -4,7 +4,7 @@ A private, read-only Zotero companion. The local app provides settings and a pre
 
 ## Open the app
 
-The Apple Silicon build is `dist/Reading Journal.app.zip`. Extract it in Downloads or Applications, then open `Reading Journal.app`. A native Reading Journal window stays open with **Open in Browser** and **Quit** buttons. Closing this window, pressing Command-Q, or using the browser's **Quit** button stops the app and its local server. Keep Zotero open with its local API enabled.
+The Apple Silicon build is `dist/Reading Journal.app.zip`. Extract it in Downloads or Applications, then open `Reading Journal.app`. A native control window stays open with **Open Journal**, **Open in Browser**, and **Quit** buttons. **Open Journal** opens the interface in an app window; closing that journal window leaves the control window available. Closing the control window, pressing Command-Q, or using the journal's **Quit** button stops the app and its local server. Keep Zotero open with its local API enabled.
 
 The ZIP is the reliable macOS deliverable. The Documents file provider on this Mac attaches metadata to a loose `.app` copied into the project folder, invalidating its signature. The signed ZIP was verified after extraction outside Documents. This is a private local build, not a notarized public release. If macOS blocks the first launch, Control-click the extracted app and choose **Open**.
 
