@@ -6,7 +6,9 @@
   <title>Reading Journal</title>
   <style>
     :root { font: 16px/1.5 system-ui,-apple-system,sans-serif; color: #202b36; background: #f5f6f3; --control-height: 40px; --control-radius: 8px; }
-    * { box-sizing: border-box; overscroll-behavior: none; }
+    * { box-sizing: border-box; }
+    html, body { overscroll-behavior: none; }
+    .settings-content, .settings-list, .collection-picker, .scope-list, .tag-filter-popover { overscroll-behavior: none; }
     body { margin: 0; }
     button,input,select,textarea { font: inherit; }
     button { cursor: pointer; }
