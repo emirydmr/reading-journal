@@ -10,6 +10,15 @@ const fmt = iso => { if(!iso)return 'Unknown date'; try {return new Intl.DateTim
 const validColor = value => /^#[0-9a-f]{6}$/i.test(value || '');
 const paperLink = (title, url) => { const node = el(url ? 'a' : 'span', 'paper-title', title); if (url) {node.href=url;node.target='_blank';node.rel='noopener noreferrer';} return node; };
 const zoteroButton = (url,label='Open in Zotero',caption='Zotero') => {if(!appConfig||!url)return null;const link=el('a','zotero-button',caption);link.href=url;link.title=label;link.setAttribute('aria-label',label);return link;};
+function eventAction(url,label,kind){
+  if(!appConfig||!url)return null;
+  const link=el('a',`event-action event-action-${kind}`);link.href=url;link.title=label;link.setAttribute('aria-label',label);
+  if(kind==='paper'){const img=el('img');img.src=zoteroIcon;img.alt='';link.append(img);}
+  else {const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
+    const page=document.createElementNS('http://www.w3.org/2000/svg','path');page.setAttribute('d','M5 2.5h10l4 4V21H5z M15 2.5v4h4 M8 10h8 M8 13h7');page.setAttribute('fill','none');page.setAttribute('stroke','currentColor');page.setAttribute('stroke-width','1.7');page.setAttribute('stroke-linejoin','round');page.setAttribute('stroke-linecap','round');
+    const mark=document.createElementNS('http://www.w3.org/2000/svg','rect');mark.setAttribute('x','8');mark.setAttribute('y','16');mark.setAttribute('width','8');mark.setAttribute('height','2.5');mark.setAttribute('rx','1');mark.setAttribute('fill','#e7b62b');svg.append(page,mark);link.append(svg);}
+  return link;
+}
 const palette = ['#1e7464','#e1a64b','#5878b9','#af718f','#86a85d','#b88258','#708d9a','#b8aa64','#7d79b1','#c2706f'];
 const allGroupers = ['status','paper','category','collection','day','week','month'];
 let groupOrder = [...data.default_groupers,...allGroupers.filter(group=>!data.default_groupers.includes(group))];
@@ -270,9 +279,12 @@ function renderFeed() {
     const list=el('div','panel');events.forEach(event=>{
       const row=el('div','event-row'),time=el('div','event-time',fmt(event.at)),main=el('div','event-main');
       const kind=el('strong','event-kind',event.type);kind.dataset.type=event.type;
-      const subject=el('div','event-subject');subject.append(paperLink(event.paper_title,event.resource_link));const paperOpen=zoteroButton(event.paper_zotero_link||event.zotero_link,'Open paper in Zotero');if(paperOpen)subject.append(paperOpen);if(event.type!=='Paper added'){const annotationOpen=zoteroButton(event.zotero_link,'Open annotation in Zotero','Annotation ↗');if(annotationOpen)subject.append(annotationOpen);}
-      main.append(kind,subject);if(event.category)main.append(el('span','badge event-category',event.category));
-      const state=el('span','small',`Now: ${event.status_group}`);row.append(time,main,state);list.append(row);
+      const subject=el('div','event-subject');subject.append(paperLink(event.paper_title,event.resource_link));main.append(kind,subject);
+      if(event.category){const category=el('span','badge event-category',event.category);if(validColor(event.color))category.style.setProperty('--annotation-color',event.color);main.append(category);}
+      const side=el('div','event-side'),state=el('span','small',`Now: ${event.status_group}`),actions=el('div','event-actions');
+      const paperOpen=eventAction(event.paper_zotero_link||event.zotero_link,'Open paper in Zotero','paper');if(paperOpen)actions.append(paperOpen);
+      if(event.type!=='Paper added'){const annotationOpen=eventAction(event.zotero_link,'Open current annotation in Zotero','annotation');if(annotationOpen)actions.append(annotationOpen);}
+      side.append(state);if(actions.childNodes.length)side.append(actions);row.append(time,main,side);list.append(row);
     });section.append(list);host.append(section);
   });
 }

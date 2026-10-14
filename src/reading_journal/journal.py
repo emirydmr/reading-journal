@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import copy
 import json
 import re
@@ -635,6 +636,7 @@ def render_html(report: dict, *, app_config: dict | None = None, app_catalog: di
         "__JOURNAL_JS__": (WEB / "report-ui.js").read_text(encoding="utf-8"),
         "__TREE_JS__": (WEB / "tree-picker.js").read_text(encoding="utf-8"),
         "__APP_JS__": app_js,
+        "__ZOTERO_ICON__": "data:image/png;base64," + base64.b64encode((WEB / "zotero-icon.png").read_bytes()).decode("ascii"),
     }
     # Substitute once so a Zotero title matching a template marker stays ordinary data.
     return re.sub("|".join(map(re.escape, replacements)), lambda match: replacements[match.group()], template)

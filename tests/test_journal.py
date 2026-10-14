@@ -148,6 +148,9 @@ class ReportTests(unittest.TestCase):
         self.assertEqual({entry["collection_group"] for entry in report["journal"]}, {"01 + 04"})
         self.assertEqual(report["journal"][0]["zotero_link"].split("?", 1)[0], "zotero://open-pdf/library/items/ATTACH01")
         self.assertNotIn("zotero://", journal.render_html(report))
+        app_html = journal.render_html(report, app_config=self.config, app_catalog={})
+        self.assertIn("data:image/png;base64,", app_html)
+        self.assertNotIn("__ZOTERO_ICON__", app_html)
         self.assertEqual([entry["color"] for entry in report["color_legend"]], [*journal.ZOTERO_ANNOTATION_COLORS, "#123456"])
         self.assertEqual({a["meaning"] for a in report["journal"]},
                          {entry["label"] for entry in report["color_legend"]})

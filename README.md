@@ -4,6 +4,8 @@ A private Zotero companion. The app reads your local library, offers explicit pa
 
 Project layout: `src/reading_journal/` contains the Python app, seed configuration, and `web/` interface; `assets/icons/` contains the current macOS icon and `previews/` holds unapproved variants; `docs/research/` preserves the framework and alignment notes; `docs/archive/` holds the earlier README; `packaging/` contains build dependencies; `tests/` contains checks. Generated reports go to `output/` and packaged apps to `dist/`.
 
+The Zotero navigation icon in `web/zotero-icon.png` comes from Zotero's [official brand resources](https://www.zotero.org/support/brand). It marks links that open Zotero; it is not this app's icon.
+
 ## Open the app
 
 The Apple Silicon build is `~/Applications/Reading Journal.app`; `dist/Reading Journal.app` is a shortcut to it. Open the app directly; the Journal window appears at launch. Closing the window, pressing Command-Q, or using the journal's **Quit** button stops the app and its local server. Keep Zotero open with its local API enabled.
