@@ -33,16 +33,25 @@ function sizeSelectionCutoff(){return $('growth-resolution').value==='month'?mon
 function sizeSelectionLabel(){return $('growth-resolution').value==='month'?`end of ${monthName(selectedSizeMonth)}`:selectedSizeDate;}
 function syncSizeControls(){const monthly=$('growth-resolution').value==='month';$('growth-month-control').hidden=!monthly;$('growth-date-control').hidden=monthly;$('growth-month').value=selectedSizeMonth;$('growth-date').value=selectedSizeDate;}
 function renderSizeCharts(){syncSizeControls();drawGrowth();const distribution=sizePieAt(sizeSelectionCutoff());drawPie(distribution.pie,distribution.multiMembership);}
-const tagSelections=new Map();
-function matchesTagSelection(id,tags){const selection=tagSelections.get(id);return selection==null||tags.some(tag=>selection.has(tag));}
+const filterSelections=new Map();
+function matchesFilterSelection(id,values){const selection=filterSelections.get(id);return selection==null||values.some(value=>selection.has(value));}
 function tagChip(tag){const chip=el('span','status-tag tag-chip',tag),style=data.tag_styles?.[tag];if(style){chip.title=style.category+' · '+style.label;chip.style.setProperty('--category-color',style.category_color);chip.style.setProperty('--tag-color',style.color);chip.style.setProperty('--tag-bg',style.color+'18');}return chip;}
+function renderFilterPicker(id,nodes,keys,labels,render){
+  const host=$(id),wasOpen=Boolean(host.querySelector('details.tag-filter[open]'));
+  const openBranches=new Map([...host.querySelectorAll('details.choice-branch')].map(branch=>[branch.dataset.key,branch.open]));
+  const details=el('details','tag-filter'),summary=el('summary'),summaryText=el('span','filter-summary-text'),body=el('div','tag-filter-popover'),tree=el('div');host.replaceChildren();details.open=wasOpen;summary.append(summaryText);
+  let selected=filterSelections.get(id);if(selected)selected=new Set([...selected].filter(key=>keys.has(key)));if(selected?.size===keys.size)selected=null;filterSelections.set(id,selected);
+  const updateLabel=()=>{const current=filterSelections.get(id);summaryText.textContent=current==null?labels.all:current.size===1?(nodes.find(node=>current.has(node.key))?.label||`1 ${labels.singular} selected`):`${current.size} ${labels.plural} selected`;all.setAttribute('aria-pressed',String(current==null));};
+  const all=el('button','filter-all');all.type='button';all.title=`Show all ${labels.plural}`;
+  all.append(el('span','filter-all-mark','✓'),el('span','filter-all-label','Show all'),el('span','filter-all-count',String(keys.size)));
+  all.addEventListener('click',()=>{filterSelections.set(id,null);renderFilterPicker(id,nodes,keys,labels,render);render();});body.append(all,tree);
+  renderChoiceTree(tree,nodes,selected||new Set(nodes.map(node=>node.key)),chosen=>{const picked=new Set([...chosen].filter(key=>keys.has(key)));filterSelections.set(id,picked.size===keys.size?null:picked);updateLabel();render();});
+  tree.querySelectorAll('details.choice-branch').forEach(branch=>{if(openBranches.has(branch.dataset.key))branch.open=openBranches.get(branch.dataset.key);});
+  if(!keys.size)tree.append(el('p','small',`No ${labels.plural} in this range.`));details.append(summary,body);host.append(details);updateLabel();
+}
 function renderTagFilter(id,names,render){
-  const host=$(id),wasOpen=Boolean(host.querySelector('details.tag-filter[open]')),details=el('details','tag-filter'),summary=el('summary'),body=el('div','tag-filter-popover'),tree=el('div');host.replaceChildren();details.open=wasOpen;
-  let selected=tagSelections.get(id);if(selected)selected=new Set([...selected].filter(tag=>names.has(tag)));tagSelections.set(id,selected);
-  const updateLabel=()=>summary.textContent=tagSelections.get(id)==null?'All tags':`${tagSelections.get(id).size} tags selected`;
-  const all=el('button','secondary','All tags');all.type='button';all.addEventListener('click',()=>{tagSelections.set(id,null);renderTagFilter(id,names,render);render();});body.append(all,tree);
-  const nodes=tagTreeNodes([...names]).map(node=>{const style=data.tag_styles?.[node.key]||Object.entries(data.tag_styles||{}).find(([name])=>node.key.startsWith('@')&&name.startsWith(node.key.slice(1)+'/'))?.[1];return {...node,color:node.key.startsWith('@')?style?.category_color:style?.color};});renderChoiceTree(tree,nodes,selected||new Set(nodes.map(node=>node.key)),keys=>{tagSelections.set(id,new Set([...keys].filter(key=>names.has(key))));updateLabel();render();});
-  if(!names.size)tree.append(el('p','small','No tags in this range.'));details.append(summary,body);host.append(details);updateLabel();
+  const nodes=tagTreeNodes([...names]).map(node=>{const style=data.tag_styles?.[node.key]||Object.entries(data.tag_styles||{}).find(([name])=>node.key.startsWith('@')&&name.startsWith(node.key.slice(1)+'/'))?.[1];return {...node,color:node.key.startsWith('@')?style?.category_color:style?.color};});
+  renderFilterPicker(id,nodes,names,{all:'All tags',singular:'tag',plural:'tags'},render);
 }
 
 const inRange = (day, range) => Boolean(day) && range.from <= day && day <= range.to;
@@ -230,7 +239,7 @@ function renderInventory() {
   const query=$('inventory-search').value.toLocaleLowerCase(),filter=$('inventory-filter').value,sort=$('inventory-sort').value;
   const visible=visibleData.inventory.filter(paper=>{
     if(query&&![paper.title,...paper.creators].join(' ').toLocaleLowerCase().includes(query))return false;
-    if(!matchesTagSelection('inventory-tag',Object.values(paper.tags).flat()))return false;
+    if(!matchesFilterSelection('inventory-tag',Object.values(paper.tags).flat()))return false;
     if(filter==='new')return visibleData.addedPaperKeys.has(paper.key);
     if(filter==='active')return visibleData.annotatedPaperKeys.has(paper.key);
     if(filter==='revisit')return paper.status.revisit;
@@ -261,15 +270,15 @@ function renderInventory() {
   if(!host.childNodes.length)host.append(el('div','panel empty','No collections in scope.'));
 }
 function openCollection(keys) {
-  $('inventory-search').value='';$('inventory-filter').value='all';tagSelections.set('inventory-tag',null);refreshFilterOptions();renderInventory();activateView('dashboard',false);
+  $('inventory-search').value='';$('inventory-filter').value='all';filterSelections.set('inventory-tag',null);refreshFilterOptions();renderInventory();activateView('dashboard',false);
   const nodes=[...$('collection-tree').querySelectorAll('details.collection-node')];
   keys.forEach(key=>{let node=nodes.find(candidate=>candidate.dataset.key===key);while(node){node.open=true;node=node.parentElement?.closest('details.collection-node');}});
   const first=nodes.find(node=>node.dataset.key===keys[0]);if(first)first.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function renderFeed() {
-  const query=$('feed-search').value.toLocaleLowerCase(),type=$('feed-type').value,collection=$('feed-collection').value;
-  const visible=visibleData.activity.filter(event=>(!type||event.type===type)&&(!collection||event.collections.includes(collection))&&matchesTagSelection('feed-tag',[...Object.values(event.tags).flat(),...(event.annotation_tags||[])])&&(!query||[event.paper_title,...event.creators,event.category||''].join(' ').toLocaleLowerCase().includes(query)));
+  const query=$('feed-search').value.toLocaleLowerCase();
+  const visible=visibleData.activity.filter(event=>matchesFilterSelection('feed-type',[event.type])&&matchesFilterSelection('feed-collection',event.collection_keys.length?event.collection_keys:['__unfiled__'])&&matchesFilterSelection('feed-tag',[...Object.values(event.tags).flat(),...(event.annotation_tags||[])])&&(!query||[event.paper_title,...event.creators,event.category||''].join(' ').toLocaleLowerCase().includes(query)));
   $('feed-result').textContent=`${visible.length} of ${visibleData.activity.length} events visible`;const host=$('feed-list');host.replaceChildren();
   if(!visible.length){host.append(el('div','panel empty','No activity matches these filters.'));return;}
   const groups=new Map();visible.forEach(event=>{const key=event.collection_group;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(event);});
@@ -309,8 +318,8 @@ function annotationCard(entry) {
 function openJournalEntry(key){
   const findCard=()=>[...$('journal-list').querySelectorAll('.journal-entry')].find(node=>node.dataset.refreshKey===`annotation:${key}`);
   if(!findCard()){
-    $('journal-search').value='';$('journal-category').value='';$('journal-collection').value='';tagSelections.set('journal-tag',null);
-    renderTagFilter('journal-tag',new Set([...visibleData.journal.flatMap(entry=>[...entry.tags,...Object.values(entry.paper_tags).flat()])]),renderJournal);
+    $('journal-search').value='';for(const id of ['journal-category','journal-collection','journal-tag'])filterSelections.set(id,null);
+    refreshFilterOptions();
     renderJournal();
   }
   const card=findCard();
@@ -360,8 +369,8 @@ function renderGroupers() {
   });
 }
 function renderJournal() {
-  const query=$('journal-search').value.toLocaleLowerCase(),category=$('journal-category').value,collection=$('journal-collection').value;
-  const visible=visibleData.journal.filter(entry=>(!category||entry.category===category)&&(!collection||entry.collections.includes(collection))&&matchesTagSelection('journal-tag',[...entry.tags,...Object.values(entry.paper_tags).flat()])&&(!query||[entry.paper_title,entry.text,entry.comment,...entry.creators].join(' ').toLocaleLowerCase().includes(query)));
+  const query=$('journal-search').value.toLocaleLowerCase();
+  const visible=visibleData.journal.filter(entry=>matchesFilterSelection('journal-category',[entry.category])&&matchesFilterSelection('journal-collection',entry.collection_keys.length?entry.collection_keys:['__unfiled__'])&&matchesFilterSelection('journal-tag',[...entry.tags,...Object.values(entry.paper_tags).flat()])&&(!query||[entry.paper_title,entry.text,entry.comment,...entry.creators].join(' ').toLocaleLowerCase().includes(query)));
   $('journal-result').textContent=`${visible.length} of ${visibleData.journal.length} annotations visible`;const host=$('journal-list'),closed=new Set([...host.querySelectorAll('details.journal-group:not([open])')].map(node=>node.dataset.groupKey));host.replaceChildren();
   if(!visible.length){host.append(el('div','panel empty','No annotations match these filters.'));return;}
   const dimensions=groupOrder.filter(group=>activeGroupers.has(group));
@@ -378,19 +387,21 @@ function renderJournal() {
 }
 
 function refreshFilterOptions() {
-  const setOptions=(id,names,allLabel)=>{
-    const select=$(id),previous=select.value,values=[...names].sort();
-    select.replaceChildren(option('',allLabel),...values.map(name=>option(name,name)));
-    select.value=values.includes(previous)?previous:'';
-  };
-  const collections=new Set(),paperTags=new Set(),annotationTags=new Set(),categories=new Set();
-  visibleData.inventory.forEach(paper=>{paper.collections.forEach(name=>collections.add(name));Object.values(paper.tags).flat().forEach(tag=>paperTags.add(tag));});
+  const paperTags=new Set(),annotationTags=new Set(),categories=new Set();
+  visibleData.inventory.forEach(paper=>Object.values(paper.tags).flat().forEach(tag=>paperTags.add(tag)));
   visibleData.journal.forEach(entry=>{categories.add(entry.category);entry.tags.forEach(tag=>annotationTags.add(tag));});
-  setOptions('feed-collection',collections,'All collections');setOptions('journal-collection',collections,'All collections');
+  const collectionNodes=data.collections.map(item=>({key:item.key,parent_key:item.parent_key,label:item.name}));
+  if([...visibleData.inventory,...visibleData.journal].some(item=>!item.collection_keys.length))collectionNodes.push({key:'__unfiled__',parent_key:null,label:'Unfiled'});
+  const collectionKeys=new Set(collectionNodes.map(node=>node.key)),collectionLabels={all:'All collections',singular:'collection',plural:'collections'};
+  renderFilterPicker('feed-collection',collectionNodes,collectionKeys,collectionLabels,renderFeed);
+  renderFilterPicker('journal-collection',collectionNodes,collectionKeys,collectionLabels,renderJournal);
+  const eventNodes=[['Paper added','#486ca2'],['Annotation created','#17645d'],['Annotation updated','#976029']].map(([key,color])=>({key,label:key,parent_key:null,color}));
+  renderFilterPicker('feed-type',eventNodes,new Set(eventNodes.map(node=>node.key)),{all:'All events',singular:'event',plural:'events'},renderFeed);
   renderTagFilter('inventory-tag',paperTags,renderInventory);
   renderTagFilter('feed-tag',new Set([...paperTags,...annotationTags]),renderFeed);
   renderTagFilter('journal-tag',new Set([...paperTags,...annotationTags]),renderJournal);
-  setOptions('journal-category',categories,'All categories');
+  const categoryNodes=[...categories].sort((a,b)=>a.localeCompare(b)).map(key=>({key,label:key,parent_key:null,color:data.color_legend.find(entry=>entry.label===key)?.color}));
+  renderFilterPicker('journal-category',categoryNodes,categories,{all:'All categories',singular:'category',plural:'categories'},renderJournal);
 }
 
 function renderVisibleRange() {
@@ -445,6 +456,6 @@ drawLegend();renderGroupers();renderVisibleRange();
 $('growth-resolution').addEventListener('change',()=>{if($('growth-resolution').value==='month')selectedSizeMonth=visibleRange.to.slice(0,7);renderSizeCharts();});
 $('growth-month').addEventListener('change',()=>{selectedSizeMonth=$('growth-month').value;renderSizeCharts();});
 $('growth-date').addEventListener('change',()=>{const chosen=$('growth-date').value;if(chosen<visibleRange.from||chosen>visibleRange.to)return;selectedSizeDate=chosen;renderSizeCharts();});
-['inventory-search','inventory-filter','inventory-sort','inventory-tag'].forEach(id=>$(id).addEventListener(id==='inventory-search'?'input':'change',renderInventory));
-['feed-search','feed-type','feed-collection','feed-tag'].forEach(id=>$(id).addEventListener(id==='feed-search'?'input':'change',renderFeed));
-['journal-search','journal-category','journal-collection','journal-tag'].forEach(id=>$(id).addEventListener(id==='journal-search'?'input':'change',renderJournal));
+['inventory-search','inventory-filter','inventory-sort'].forEach(id=>$(id).addEventListener(id==='inventory-search'?'input':'change',renderInventory));
+$('feed-search').addEventListener('input',renderFeed);
+$('journal-search').addEventListener('input',renderJournal);

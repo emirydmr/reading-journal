@@ -221,9 +221,17 @@
     .check-label { display: flex; gap: 8px; align-items: center; font-size: .78rem; padding: 8px 0; }
     .tag-filter { position: relative; margin-top: 5px; font-weight: 400; }
     .tag-filter > summary { list-style: none; min-height: var(--control-height); height: var(--control-height); display: flex; align-items: center; padding: 0 10px; border: 1px solid #ccd8d2; border-radius: 8px; background: white; font-size: .84rem; cursor: pointer; }
-    .tag-filter > summary::after { content: '⌄'; margin-left: auto; }
+    .filter-summary-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tag-filter > summary::after { content: '⌄'; flex: 0 0 auto; margin-left: auto; }
     .tag-filter > summary::-webkit-details-marker { display: none; }
     .tag-filter-popover { position: absolute; z-index: 15; top: calc(100% + 5px); right: 0; min-width: 280px; max-width: min(400px,85vw); max-height: 350px; overflow: auto; background: white; border: 1px solid #d8e4d8; border-radius: 9px; padding: 10px; box-shadow: 0 12px 25px #173d3922; }
+    .filter-all { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 39px; margin-bottom: 7px; padding: 5px 9px; border: 1px solid #d7e3d9; border-radius: 8px; background: #f7faf7; color: #285447; text-align: left; font-size: .8rem; font-weight: 700; }
+    .filter-all:hover { border-color: #8bbda5; background: #eff7f1; }
+    .filter-all[aria-pressed="true"] { border-color: #80b49a; background: #e5f3e9; }
+    .filter-all-mark { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid #a5baac; border-radius: 6px; color: transparent; background: white; }
+    .filter-all[aria-pressed="true"] .filter-all-mark { border-color: #1e7464; background: #1e7464; color: white; }
+    .filter-all-count { margin-left: auto; color: #698076; font-weight: 500; }
+    .tag-filter-popover .choice-leaf:hover,.tag-filter-popover .choice-branch > summary:hover { background: #f4f8f4; }
     .tag-chip { border-left: 4px solid var(--category-color,#7b9185); background: var(--tag-bg,#edf3ee); color: #284439; }
     .tag-chip::before { content: ''; display: inline-block; width: 8px; height: 8px; background: var(--tag-color,#7b9185); border-radius: 50%; margin-right: 5px; }
     @media (max-width: 650px) { .scope-grid { grid-template-columns: 1fr; } .editor-pair { grid-template-columns: 1fr; } .editor-grid { grid-template-columns: 35px minmax(0,1fr) 30px; gap: 7px; } .editor-grid input.editor-swatch { width: 35px; } }
@@ -285,8 +293,8 @@
       <div class="page-head"><div><h1 id="feed-heading">Activity Feed</h1><p class="help">Edits within 20 minutes of creating an annotation count as creation. Later changes appear as updates; Zotero does not identify which field changed.</p></div></div>
       <div class="controls">
         <label>Search<input id="feed-search" type="search" placeholder="Paper or author"></label>
-        <label>Event<select id="feed-type"><option value="">All events</option><option>Paper added</option><option>Annotation created</option><option>Annotation updated</option></select></label>
-        <label>Collection<select id="feed-collection"><option value="">All collections</option></select></label>
+        <div class="field-label">Event<div id="feed-type"></div></div>
+        <div class="field-label">Collection<div id="feed-collection"></div></div>
         <div class="field-label">Tags<div id="feed-tag"></div></div>
       </div>
       <div id="feed-result" class="result-line" aria-live="polite"></div><div id="feed-list"></div>
@@ -295,8 +303,8 @@
       <div class="page-head"><h1 id="journal-heading">Journal Entries</h1></div>
       <div class="controls">
         <label>Search<input id="journal-search" type="search" placeholder="Paper, passage, comment"></label>
-        <label>Annotation category<select id="journal-category"><option value="">All categories</option></select></label>
-        <label>Collection<select id="journal-collection"><option value="">All collections</option></select></label>
+        <div class="field-label">Annotation category<div id="journal-category"></div></div>
+        <div class="field-label">Collection<div id="journal-collection"></div></div>
         <div class="field-label">Tags<div id="journal-tag"></div></div>
       </div>
       <div class="small">Group by · click to toggle, drag or use arrows to reorder · weeks run Monday–Sunday</div>

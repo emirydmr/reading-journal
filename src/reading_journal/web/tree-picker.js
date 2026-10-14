@@ -19,12 +19,14 @@ function renderChoiceTree(host,nodes,selected,onChange=()=>{},renderContent=null
   nodes.forEach(node=>{const parent=keys.has(node.parent_key)?node.parent_key:null;if(!children.has(parent))children.set(parent,[]);children.get(parent).push(node);});
   const current=()=>new Set([...inputs].filter(([,input])=>input.checked).map(([key])=>key));
   function branch(node,depth=0){
-    const below=children.get(node.key)||[],box=el(below.length?'details':'div',below.length?'choice-branch':'choice-leaf');
+    const below=children.get(node.key)||[],box=el(below.length?'details':'div',below.length?'choice-branch':'choice-leaf');box.dataset.key=node.key;
     if(below.length)box.open=depth===0;
     const row=el(below.length?'summary':'div','choice-line'),input=el('input');input.type='checkbox';input.value=node.key;input.checked=selected.has(node.key);input.className='tree-check';input.setAttribute('aria-label',node.label);inputs.set(node.key,input);
     input.addEventListener('click',event=>event.stopPropagation());
     input.addEventListener('change',()=>{const next=cascadeTreeSelection(current(),nodes,node.key,input.checked);for(const [key,control] of inputs)control.checked=next.has(key);onChange(current());});
-    row.append(input);if(node.color){const dot=el('span','category-dot');dot.style.background=node.color;row.append(dot);}row.append(el('span','choice-name',node.label));if(below.length)row.append(el('span','choice-count',String(below.length)));box.append(row);
+    row.append(input);if(node.color){const dot=el('span','category-dot');dot.style.background=node.color;row.append(dot);}const name=el('span','choice-name',node.label);row.append(name);if(below.length)row.append(el('span','choice-count',String(below.length)));box.append(row);
+    name.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();input.click();});
+    if(!below.length)row.addEventListener('click',event=>{if(event.target!==input&&event.target!==name)input.click();});
     if(renderContent){const content=renderContent(node);if(content)box.append(content);}
     if(below.length){const body=el('div','choice-children');below.forEach(child=>body.append(branch(child,depth+1)));box.append(body);}
     return box;

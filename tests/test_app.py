@@ -88,6 +88,9 @@ class AppServerTests(unittest.TestCase):
             self.assertIn('id="setting-timezone-search"', html)
             self.assertIn('id="view-journal"', html)
             self.assertIn('id="range-dialog"', html)
+            for picker in ("feed-type", "feed-collection", "journal-category", "journal-collection"):
+                self.assertIn(f'<div id="{picker}"></div>', html)
+                self.assertNotIn(f'<select id="{picker}"', html)
         with self.request(f"/export?token={self.token}&from=2026-10-01&to=2026-10-14") as response:
             html = response.read().decode("utf-8")
             self.assertIn("attachment;", response.headers["Content-Disposition"])
