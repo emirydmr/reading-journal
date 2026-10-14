@@ -183,6 +183,10 @@ function drawLegend() {
   });
 }
 
+function isUnassignedPaper(paper) {
+  return paper.status.label === 'Unassigned' && !paper.status.revisit;
+}
+
 function statusPaint(paper) {
   if (paper.status.label==='Conflicting statuses')return ['#bc6464','#fcf1f0'];
   if (paper.status.revisit)return [data.status_roles.revisit.color,data.status_roles.revisit.background];
@@ -202,7 +206,7 @@ function renderStatusSummary() {
     ['new','New',paper=>visibleData.addedPaperKeys.has(paper.key),'#1e7464','#eaf4ed'],
     ...['to_read','reading','read'].filter(role=>roles[role].tag).map(role=>[role,roles[role].label,paper=>paper.status.label===roles[role].label,roles[role].color,roles[role].background]),
     ...(roles.revisit.tag?[['revisit',roles.revisit.label,paper=>paper.status.revisit,roles.revisit.color,roles.revisit.background]]:[]),
-    ['unassigned','Unassigned',paper=>paper.status.label==='Unassigned','#aab5af','#f7f8f6'],
+    ['unassigned','Unassigned',isUnassignedPaper,'#aab5af','#f7f8f6'],
     ['conflicting','Conflicts',paper=>paper.status.label==='Conflicting statuses','#bc6464','#fcf1f0']
   ];
   values.forEach(([filter,label,matches,color,background])=>{
@@ -218,7 +222,7 @@ function renderInventory() {
     if(filter==='new')return visibleData.addedPaperKeys.has(paper.key);
     if(filter==='active')return visibleData.annotatedPaperKeys.has(paper.key);
     if(filter==='revisit')return paper.status.revisit;
-    if(filter==='unassigned')return paper.status.label==='Unassigned';
+    if(filter==='unassigned')return isUnassignedPaper(paper);
     if(filter==='conflicting')return paper.status.label==='Conflicting statuses';
     if(['to_read','reading','read'].includes(filter))return paper.status.label===data.status_roles[filter].label;
     return true;
