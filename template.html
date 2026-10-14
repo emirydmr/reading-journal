@@ -60,7 +60,7 @@
     .controls label,.field-label { display: block; color: #53615e; font-size: .76rem; font-weight: 700; }
     .controls input,.controls select,.settings-grid input:not([type="checkbox"]),.settings-grid select,.settings-grid textarea { width: 100%; border: 1px solid #ccd8d2; border-radius: var(--control-radius); padding: 0 10px; background: white; color: #20312d; margin-top: 5px; }
     .controls input,.controls select,.settings-grid input:not([type="checkbox"]),.settings-grid select { height: var(--control-height); }
-    .controls select,.chart-controls select,.settings-grid select { -webkit-appearance: none; appearance: none; display: block; height: var(--control-height); min-height: var(--control-height); line-height: normal; padding: 0 34px 0 10px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23536b61' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 12px 8px; }
+    .controls select,.chart-controls select,.settings-grid select,.editor-grid select { -webkit-appearance: none; appearance: none; display: block; height: var(--control-height); min-height: var(--control-height); line-height: normal; padding: 0 34px 0 10px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23536b61' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 12px 8px; }
     .settings-grid input[type="color"] { padding: 4px; }
     .settings-grid textarea { min-height: 90px; padding-block: 8px; resize: vertical; }
     .timezone-setting .small { display: block; margin-top: 4px; font-weight: 400; }
@@ -133,6 +133,61 @@
     .primary { border: 1px solid #1e7464; background: #1e7464; color: white; }
     .secondary { border: 1px solid #b9cfc2; background: white; color: #244f43; }
     .error { color: #a34242; font-size: .84rem; }
+    #settings-dialog { width: min(1040px,95vw); height: min(900px,92vh); max-height: 92vh; overflow: hidden; }
+    #settings-dialog[open] { display: flex; flex-direction: column; }
+    #settings-dialog .settings-head { position: static; flex: 0 0 auto; }
+    #settings-dialog .settings-content { flex: 1; min-height: 0; max-height: none; overflow: auto; }
+    .settings-footer { flex: 0 0 auto; padding: 12px 22px; background: white; border-top: 1px solid #dfe7df; }
+    .settings-footer .settings-actions { margin: 0; }
+    .settings-footer .error:not(:empty) { margin-bottom: 8px; }
+    .first-section { border: 0; padding-top: 0; margin-top: 0; }
+    .settings-section-head { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+    .settings-section-head h3 { margin-bottom: 4px; }
+    .editor-list { display: grid; gap: 10px; }
+    .editor-grid { display: grid; grid-template-columns: 48px minmax(0,1fr) 36px; grid-template-rows: auto auto; gap: 7px 12px; padding: 12px; background: #f5f8f4; border: 1px solid #e0e7df; border-radius: 10px; }
+    .editor-grid > :nth-child(2) { grid-column: 2; grid-row: 1; }
+    .editor-grid > :nth-child(3) { grid-column: 2; grid-row: 2; }
+    .editor-grid label { display: block; min-width: 0; font-size: .71rem; font-weight: 600; color: #596a61; }
+    .editor-grid input:not([type="color"]),.editor-grid select { width: 100%; min-width: 0; height: var(--control-height); margin-top: 3px; border: 1px solid #cddbd1; border-radius: 7px; padding: 0 10px; background-color: white; color: #20312d; font-size: .84rem; font-weight: 400; }
+    .editor-grid input.editor-swatch { grid-column: 1; grid-row: 1 / 3; width: 48px; height: 100%; min-height: 96px; padding: 0; border: 0; background: transparent; cursor: pointer; border-radius: 7px; }
+    .editor-grid select { padding-right: 34px; }
+    .editor-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+    .editor-swatch::-webkit-color-swatch { border: 0; border-radius: 7px; }
+    .editor-swatch::-moz-color-swatch { border: 0; border-radius: 7px; }
+    .editor-pair { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+    .icon-button { grid-column: 3; grid-row: 1 / 3; align-self: center; width: 36px; height: 40px; padding: 8px; border: 0; border-radius: 7px; background: transparent; color: #75837b; }
+    .icon-button:hover { background: #f6e8e5; color: #a34242; }
+    .icon-button svg { width: 20px; height: 20px; }
+    .tag-category { border: 1px solid #dce6dd; border-radius: 10px; overflow: hidden; }
+    .tag-category-heading { padding: 13px 15px; cursor: pointer; color: #244f43; font-weight: 650; }
+    .category-dot { display: inline-block; width: 13px; height: 13px; margin-right: 9px; border-radius: 4px; }
+    .tag-category-body { padding: 0 12px 12px; }
+    .tag-inclusion { margin: 12px 0; padding: 8px 12px; background: #f5f8f4; border-radius: 8px; }
+    .tag-inclusion > summary { cursor: pointer; font-size: .83rem; font-weight: 650; }
+    .tag-definitions { display: grid; gap: 8px; margin-bottom: 12px; }
+    .scope-grid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); align-items: stretch; gap: 14px; }
+    .scope-panel { border: 1px solid #dce6dd; border-radius: 10px; overflow: hidden; }
+    .scope-panel h4 { font-size: .8rem; margin: 0; padding: 11px 14px; background: #f0f5ef; }
+    .scope-list { height: 310px; overflow: auto; padding: 7px 10px; }
+    .scope-list > label,.choice-line { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 5px 4px; font-size: .8rem; font-weight: 500; color: #435a4e; cursor: pointer; }
+    .scope-list > label input,.choice-line input,.check-label input { flex: 0 0 auto; width: 15px; height: 15px; margin: 0; accent-color: #1e7464; }
+    .choice-branch > summary { list-style: none; }
+    .choice-branch > summary::-webkit-details-marker { display: none; }
+    .choice-branch > summary::before { content: '›'; flex: 0 0 12px; font-size: 18px; line-height: 1; text-align: center; }
+    .choice-branch[open] > summary::before { transform: rotate(90deg); }
+    .choice-leaf .choice-line { padding-left: 24px; }
+    .choice-children { margin-left: 13px; border-left: 1px solid #d8e4d8; padding-left: 8px; }
+    .choice-name { flex: 1; min-width: 0; }
+    .choice-count { color: #7b8a80; font-size: .72rem; }
+    .check-label { display: flex; gap: 8px; align-items: center; font-size: .78rem; padding: 8px 0; }
+    .tag-filter { position: relative; margin-top: 5px; font-weight: 400; }
+    .tag-filter > summary { list-style: none; min-height: var(--control-height); height: var(--control-height); display: flex; align-items: center; padding: 0 10px; border: 1px solid #ccd8d2; border-radius: 8px; background: white; font-size: .84rem; cursor: pointer; }
+    .tag-filter > summary::after { content: '⌄'; margin-left: auto; }
+    .tag-filter > summary::-webkit-details-marker { display: none; }
+    .tag-filter-popover { position: absolute; z-index: 15; top: calc(100% + 5px); right: 0; min-width: 280px; max-width: min(400px,85vw); max-height: 350px; overflow: auto; background: white; border: 1px solid #d8e4d8; border-radius: 9px; padding: 10px; box-shadow: 0 12px 25px #173d3922; }
+    .tag-chip { border-left: 4px solid var(--category-color,#7b9185); background: var(--tag-bg,#edf3ee); color: #284439; }
+    .tag-chip::before { content: ''; display: inline-block; width: 8px; height: 8px; background: var(--tag-color,#7b9185); border-radius: 50%; margin-right: 5px; }
+    @media (max-width: 650px) { .scope-grid { grid-template-columns: 1fr; } .editor-pair { grid-template-columns: 1fr; } .editor-grid { grid-template-columns: 35px minmax(0,1fr) 30px; gap: 7px; } .editor-grid input.editor-swatch { width: 35px; } }
     @media (max-width: 850px) { .header-inner { flex-wrap: wrap; padding-block: 9px; gap: 8px; } .site-nav { order: 3; flex-basis: 100%; } .color-grid { grid-template-columns: 1fr 1fr; } .controls { grid-template-columns: repeat(2,minmax(0,1fr)); } }
     @media (max-width: 560px) { .wrap { padding-inline: 15px; } .stats,.charts,.color-grid,.controls,.pie-layout,.settings-grid { grid-template-columns: 1fr; } .event-row { grid-template-columns: 1fr; gap: 4px; } .paper-row { grid-template-columns: 1fr; } .status-tags { justify-content: flex-start; } .site-nav button { padding-inline: 7px; font-size: .75rem; } }
     @media print { .site-header { position: static; box-shadow: none; } .site-nav,.header-actions,.controls,.groupers { display: none; } .view:not([hidden]) { display: block; } .collection-node,.journal-group { break-inside: avoid; } .panel,.stat { box-shadow: none; } }
@@ -177,7 +232,7 @@
           <label>Search papers<input id="inventory-search" type="search" placeholder="Title or author"></label>
           <label>Show<select id="inventory-filter"><option value="all">All papers</option><option value="new">New in this period</option><option value="active">Annotation activity in this period</option><option value="to_read">To read</option><option value="reading">Reading</option><option value="read">Read</option><option value="revisit">Revisit</option><option value="unassigned">Unassigned</option><option value="conflicting">Conflicting statuses</option></select></label>
           <label>Sort<select id="inventory-sort"><option value="title">Title A–Z</option><option value="newest">Newest added</option><option value="oldest">Oldest added</option><option value="annotation">Recent annotation activity</option><option value="status">Reading status</option></select></label>
-          <label>Categorized tag<select id="inventory-tag"><option value="">All tags</option></select></label>
+          <div class="field-label">Tags<div id="inventory-tag"></div></div>
         </div>
         <div id="inventory-result" class="result-line" aria-live="polite"></div>
         <div id="collection-tree"></div>
@@ -189,7 +244,7 @@
         <label>Search<input id="feed-search" type="search" placeholder="Paper or author"></label>
         <label>Event<select id="feed-type"><option value="">All events</option><option>Paper added</option><option>Annotation added</option><option>Annotation modified</option></select></label>
         <label>Collection<select id="feed-collection"><option value="">All collections</option></select></label>
-        <label>Categorized tag<select id="feed-tag"><option value="">All tags</option></select></label>
+        <div class="field-label">Tags<div id="feed-tag"></div></div>
       </div>
       <div id="feed-result" class="result-line" aria-live="polite"></div><div id="feed-list"></div>
     </section>
@@ -199,7 +254,7 @@
         <label>Search<input id="journal-search" type="search" placeholder="Paper, passage, comment"></label>
         <label>Annotation category<select id="journal-category"><option value="">All categories</option></select></label>
         <label>Collection<select id="journal-collection"><option value="">All collections</option></select></label>
-        <label>Categorized tag<select id="journal-tag"><option value="">All tags</option></select></label>
+        <div class="field-label">Tags<div id="journal-tag"></div></div>
       </div>
       <div class="small">Group by · click to toggle, drag or use arrows to reorder · weeks run Monday–Sunday</div>
       <div id="groupers" class="groupers" aria-label="Journal grouping order"></div>
@@ -211,6 +266,7 @@
     const appConfig = __APP_CONFIG__;
     const appCatalog = __APP_CATALOG__;
     const appToken = __APP_TOKEN__;
+    __TREE_JS__
     __JOURNAL_JS__
     __APP_JS__
   </script>

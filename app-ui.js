@@ -1,53 +1,49 @@
-function cascadeCollectionSelection(selected,collections,key,checked) {
-  const next=new Set(selected);
-  if(!checked){next.delete(key);return next;}
-  const children=new Map();
-  collections.forEach(item=>{if(!children.has(item.parent_key))children.set(item.parent_key,[]);children.get(item.parent_key).push(item.key);});
-  const visit=current=>{next.add(current);(children.get(current)||[]).forEach(visit);};
-  visit(key);return next;
-}
 if (appConfig) {
   const dialog=$('settings-dialog');
   const checkbox=(host,value,label,checked)=>{const row=el('label'),input=el('input');input.type='checkbox';input.value=value;input.checked=checked;row.append(input,el('span','',label));host.append(row);};
   const field=(label,value,type='text')=>{const wrap=el('label','',label),input=el('input');input.type=type;input.value=value;wrap.append(input);return [wrap,input];};
   const dismiss=()=>dialog.close();
+  function trashButton(label,remove) {
+    const button=el('button','icon-button');button.type='button';button.title=label;button.setAttribute('aria-label',label);
+    const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
+    const path=document.createElementNS(ns,'path');path.setAttribute('d','M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7');path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','1.6');path.setAttribute('stroke-linecap','round');svg.append(path);button.append(svg);button.addEventListener('click',remove);return button;
+  }
+  function swatch(hex,label) {const input=el('input','editor-swatch');input.type='color';input.value=validColor(hex)?hex:'#7b9185';input.setAttribute('aria-label',label);return input;}
   function colorRow(hex,meaning) {
-    const row=el('div','settings-grid'),[colorWrap,colorInput]=field('Colour',hex,'color'),[labelWrap,labelInput]=field('Meaning',meaning.label),[descWrap,descInput]=field('Description',meaning.description||'');
-    row.classList.add('color-setting');row.style.marginBottom='9px';row.append(colorWrap,labelWrap,descWrap);
-    const remove=el('button','secondary','Remove');remove.type='button';remove.addEventListener('click',()=>row.remove());row.append(remove);
-    $('setting-colors').append(row);return [colorInput,labelInput,descInput];
+    const row=el('div','editor-grid annotation-setting'),color=swatch(hex,'Annotation color');
+    const [meaningWrap,meaningInput]=field('Meaning',meaning.label),[descriptionWrap,descriptionInput]=field('Description',meaning.description||'');
+    row.append(color,meaningWrap,descriptionWrap,trashButton('Remove annotation color',()=>row.remove()));row.editor={color,meaningInput,descriptionInput};$('setting-colors').append(row);
   }
   function categoryRow(name,rule) {
-    const row=el('div','settings-grid'),[nameWrap,nameInput]=field('Category',name),[prefixWrap,prefixInput]=field('Prefix',rule.prefix||'');
-    row.classList.add('category-setting');row.style.marginBottom='9px';
-    const allowedWrap=el('label','','Allowed tags (one per line; blank allows every tag with this prefix)'),allowedInput=el('textarea');allowedInput.rows=3;allowedInput.value=(rule.allowed_tags||[]).join('\n');allowedWrap.append(allowedInput);
-    const existing=el('div','small');const showExisting=()=>{const matches=appCatalog.tags.filter(tag=>tag.startsWith(prefixInput.value.trim()));existing.textContent=matches.length?`Existing tags: ${matches.join(', ')}`:'No matching tags currently in Zotero.';};prefixInput.addEventListener('input',showExisting);showExisting();
-    const remove=el('button','secondary','Remove');remove.type='button';remove.addEventListener('click',()=>row.remove());row.append(nameWrap,prefixWrap,allowedWrap,remove);$('setting-categories').append(row);
-    row.append(existing);
-    return [nameInput,prefixInput,allowedInput];
+    const card=el('details','tag-category');const summary=el('summary','tag-category-heading'),dot=el('span','category-dot'),title=el('span','',name);dot.style.background=rule.color;summary.append(dot,title);card.append(summary);
+    const body=el('div','tag-category-body'),row=el('div','editor-grid'),color=swatch(rule.color,'Category color');
+    const top=el('div','editor-pair'),[nameWrap,nameInput]=field('Category',name),[prefixWrap,prefixInput]=field('Prefix',rule.prefix||'');top.append(nameWrap,prefixWrap);
+    const [descWrap,descInput]=field('Description',rule.description||'');row.append(color,top,descWrap,trashButton('Remove tag category',()=>card.remove()));body.append(row);
+    const picker=el('details','tag-inclusion');picker.append(el('summary','','Included tags'));const tree=el('div','tag-choice-tree');picker.append(tree);
+    const futureLabel=el('label','check-label'),future=el('input');future.type='checkbox';future.checked=rule.selection_mode==='prefix';futureLabel.append(future,el('span','','Include future tags with this prefix'));picker.append(futureLabel);body.append(picker);
+    const definitions=el('div','tag-definitions');body.append(definitions);const removed=new Set();let chosen=new Set(rule.allowed_tags||[]),getSelected=()=>chosen;
+    const matchingTags=prefix=>appCatalog.tags.filter(tag=>prefix?tag.startsWith(prefix):!Object.values(appCatalog.tag_categories).some(category=>category.prefix&&tag.startsWith(category.prefix)));
+    function refreshTree(){future.disabled=!prefixInput.value;if(future.disabled)future.checked=false;const names=[...new Set([...matchingTags(prefixInput.value),...[...definitions.children].map(node=>node.editor.key.value)])];
+      if(future.checked)chosen=new Set(names);removed.forEach(tag=>chosen.delete(tag));
+      getSelected=renderChoiceTree(tree,tagTreeNodes(names,prefixInput.value),chosen,selected=>{chosen=selected;future.checked=false;});
+    }
+    function addTag(key,definition={}) {
+      const tagRow=el('div','editor-grid tag-definition'),tagColor=swatch(definition.color||color.value,'Tag color');
+      const first=el('div','editor-pair'),[keyWrap,keyInput]=field('Tag',key),[labelWrap,labelInput]=field('Meaning',definition.label||key.split('/').at(-1));first.append(keyWrap,labelWrap);
+      const second=el('div','editor-pair'),[descriptionWrap,descriptionInput]=field('Description',definition.description||''),roleWrap=el('label','','Reading meaning'),role=el('select');
+      [['','None'],['to_read','To read'],['reading','Reading'],['read','Read'],['revisit','Revisit']].forEach(([value,label])=>role.append(option(value,label)));role.value=definition.reading_role||'';roleWrap.append(role);second.append(descriptionWrap,roleWrap);
+      tagRow.append(tagColor,first,second,trashButton('Remove tag definition',()=>{removed.add(keyInput.value);chosen=getSelected();chosen.delete(keyInput.value);tagRow.remove();refreshTree();}));
+      tagRow.editor={key:keyInput,label:labelInput,color:tagColor,description:descriptionInput,role};definitions.append(tagRow);
+      keyInput.addEventListener('change',()=>{chosen=getSelected();chosen.delete(key);chosen.add(keyInput.value);refreshTree();});
+    }
+    const known=[...new Set([...Object.keys(rule.tags||{}),...matchingTags(rule.prefix)])].sort();known.forEach(tag=>addTag(tag,rule.tags?.[tag]||{}));
+    const add=el('button','secondary','Add tag');add.type='button';add.addEventListener('click',()=>{chosen=getSelected();let key=prefixInput.value+'new-tag',number=2;while([...definitions.children].some(node=>node.editor.key.value===key))key=prefixInput.value+'new-tag-'+number++;addTag(key);chosen.add(key);refreshTree();});body.append(add);
+    nameInput.addEventListener('input',()=>title.textContent=nameInput.value);color.addEventListener('input',()=>dot.style.background=color.value);
+    prefixInput.addEventListener('change',()=>{chosen=getSelected();refreshTree();});future.addEventListener('change',()=>{chosen=getSelected();refreshTree();});
+    card.append(body);card.editor={name:nameInput,prefix:prefixInput,color,description:descInput,definitions,future,selected:()=>getSelected()};$('setting-categories').append(card);refreshTree();
   }
   function fillCollectionTree() {
-    const host=$('setting-collections');host.replaceChildren();
-    const byKey=new Map(appCatalog.collections.map(item=>[item.key,item]));
-    const children=new Map();
-    appCatalog.collections.forEach(item=>{const parent=byKey.has(item.parent_key)?item.parent_key:'';if(!children.has(parent))children.set(parent,[]);children.get(parent).push(item);});
-    const selected=new Set(appCatalog.selected_collections||[]),inputs=new Map(),notes=new Map();
-    const descendants=key=>(children.get(key)||[]).flatMap(child=>[child.key,...descendants(child.key)]);
-    const updateNotes=()=>{for(const [key,note] of notes){const below=descendants(key),checked=below.filter(child=>inputs.get(child).checked).length;
-      note.textContent=checked&&checked<below.length?' · some descendants selected':checked===below.length&&below.length&&!inputs.get(key).checked?' · descendants selected':'';
-    }};
-    function branch(item) {
-      const li=el('li','collection-choice'),row=el('label','collection-choice-row'),input=el('input');input.type='checkbox';input.value=item.key;input.checked=selected.has(item.key);inputs.set(item.key,input);
-      const name=el('span','',item.name),note=el('span','collection-choice-note');notes.set(item.key,note);row.append(input,name,note);li.append(row);
-      input.addEventListener('change',()=>{const active=new Set([...inputs].filter(([,node])=>node.checked).map(([key])=>key));
-        const next=cascadeCollectionSelection(active,appCatalog.collections,item.key,input.checked);
-        for(const [key,node] of inputs)node.checked=next.has(key);
-        updateNotes();});
-      const below=children.get(item.key)||[];
-      if(below.length){const list=el('ul','collection-choice-children');below.forEach(child=>list.append(branch(child)));li.append(list);}
-      return li;
-    }
-    const tree=el('ul','collection-choice-list');(children.get('')||[]).forEach(item=>tree.append(branch(item)));host.append(tree);updateNotes();
+    renderChoiceTree($('setting-collections'),appCatalog.collections.map(item=>({...item,label:item.name})),new Set(appCatalog.selected_collections||[]));
   }
   function renderTimezones(query,selected) {
     const select=$('setting-timezone'),names=appCatalog.timezones||[selected];
@@ -70,17 +66,9 @@ if (appConfig) {
     $('setting-unfiled').checked=Boolean(appConfig.include_unfiled);
     fillCollectionTree();
     const types=$('setting-types');types.replaceChildren();
-    appCatalog.paper_types.forEach(name=>checkbox(types,name,name,(appConfig.paper_types||[]).includes(name)));
-    const statuses=$('setting-statuses');statuses.replaceChildren();
-    for(const role of ['to_read','reading','read','revisit']){
-      const box=el('div');box.dataset.role=role;box.append(el('h3','',role.replace('_',' ')));
-      for(const property of ['tag','label','color','background']){
-        const [wrap,input]=field(property[0].toUpperCase()+property.slice(1),appConfig.status_roles[role][property],property==='color'||property==='background'?'color':'text');input.dataset.property=property;box.append(wrap);
-      }
-      statuses.append(box);
-    }
+    appCatalog.paper_types.forEach(name=>checkbox(types,name,name.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,letter=>letter.toUpperCase()),(appConfig.paper_types||[]).includes(name)));
     $('setting-colors').replaceChildren();Object.entries(appConfig.annotation_colors||{}).forEach(([hex,meaning])=>colorRow(hex,typeof meaning==='string'?{label:meaning,description:''}:meaning));
-    $('setting-categories').replaceChildren();Object.entries(appConfig.tag_categories||{}).forEach(([name,rule])=>categoryRow(name,rule));
+    $('setting-categories').replaceChildren();Object.entries(appCatalog.tag_categories||{}).forEach(([name,rule])=>categoryRow(name,rule));
   }
   $('app-settings').addEventListener('click',()=>{fillSettings();dialog.showModal();});
   $('setting-timezone-search').addEventListener('input',()=>renderTimezones($('setting-timezone-search').value,$('setting-timezone').value));
@@ -95,7 +83,7 @@ if (appConfig) {
   });
   $('settings-close').addEventListener('click',dismiss);$('settings-cancel').addEventListener('click',dismiss);
   $('add-color').addEventListener('click',()=>colorRow('#999999',{label:'New meaning',description:''}));
-  $('add-category').addEventListener('click',()=>categoryRow('New category',{prefix:'new/',allowed_tags:[]}));
+  $('add-category').addEventListener('click',()=>categoryRow('New category',{prefix:'new/',allowed_tags:[],tags:{},color:'#7b9185',selection_mode:'explicit'}));
   $('app-refresh').addEventListener('click',()=>window.location.reload());
   const query=()=>`token=${encodeURIComponent(appToken)}&from=${encodeURIComponent($('setting-from').value||data.range.from)}&to=${encodeURIComponent($('setting-to').value||data.range.to)}`;
   $('app-export').addEventListener('click',()=>{window.location.href='/export?'+query();});
@@ -107,9 +95,10 @@ if (appConfig) {
     next.included_collections=[...$('setting-collections').querySelectorAll('input:checked')].map(input=>input.value);
     next.paper_types=[...$('setting-types').querySelectorAll('input:checked')].map(input=>input.value);
     next.default_groupers=groupOrder.filter(group=>activeGroupers.has(group));
-    for(const box of $('setting-statuses').children){const role=box.dataset.role;for(const input of box.querySelectorAll('input'))next.status_roles[role][input.dataset.property]=input.value.trim();}
-    next.annotation_colors={};for(const row of $('setting-colors').children){const inputs=row.querySelectorAll('input');const hex=inputs[0].value.toLowerCase();if(next.annotation_colors[hex]){$('settings-error').textContent=`Duplicate annotation colour: ${hex}`;return;}next.annotation_colors[hex]={label:inputs[1].value.trim(),description:inputs[2].value.trim()};}
-    next.tag_categories={};for(const row of $('setting-categories').children){const inputs=row.querySelectorAll('input'),name=inputs[0].value.trim();if(next.tag_categories[name]){$('settings-error').textContent=`Duplicate category: ${name}`;return;}next.tag_categories[name]={prefix:inputs[1].value.trim(),allowed_tags:row.querySelector('textarea').value.split('\n').map(value=>value.trim()).filter(Boolean)};}
+    next.annotation_colors={};for(const row of $('setting-colors').children){const edit=row.editor,hex=edit.color.value.toLowerCase();if(next.annotation_colors[hex]){$('settings-error').textContent=`Duplicate annotation color: ${hex}`;return;}next.annotation_colors[hex]={label:edit.meaningInput.value.trim(),description:edit.descriptionInput.value.trim()};}
+    next.tag_schema_version=2;next.tag_categories={};for(const card of $('setting-categories').children){const edit=card.editor,name=edit.name.value.trim();if(next.tag_categories[name]){$('settings-error').textContent=`Duplicate category: ${name}`;return;}
+      const tags={};for(const row of edit.definitions.children){const tag=row.editor,key=tag.key.value.trim();if(tags[key]){$('settings-error').textContent=`Duplicate tag: ${key}`;return;}tags[key]={label:tag.label.value.trim(),color:tag.color.value,description:tag.description.value.trim(),reading_role:tag.role.value};}
+      next.tag_categories[name]={prefix:edit.prefix.value.trim(),color:edit.color.value,description:edit.description.value.trim(),selection_mode:edit.future.checked?'prefix':'explicit',allowed_tags:[...edit.selected()].filter(key=>!key.startsWith('@')),tags};}
     try{
       const response=await fetch('/settings?token='+encodeURIComponent(appToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:next,from:$('setting-from').value,to:$('setting-to').value})});
       const answer=await response.json();if(!response.ok)throw new Error(answer.error||'Could not save settings');

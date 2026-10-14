@@ -93,6 +93,29 @@ class AppServerTests(unittest.TestCase):
 
 
 class ConfigPersistenceTests(unittest.TestCase):
+    def test_unified_tag_migration_and_removed_reading_mapping(self):
+        original = journal.load_config(journal.HERE / "config.json")
+        migrated = journal.editable_tag_config(original)
+        validated = journal.validate_config(migrated)
+        self.assertEqual(validated["status_roles"]["read"]["tag"], "status/read")
+        del migrated["tag_categories"]["Status"]["tags"]["status/read"]
+        migrated["tag_categories"]["Status"]["allowed_tags"].remove("status/read")
+        validated = journal.validate_config(migrated)
+        self.assertEqual(validated["status_roles"]["read"]["tag"], "")
+        self.assertEqual(journal.reading_status([{"tag": "status/read"}], "P", validated)[0]["label"], "Unassigned")
+        self.assertNotIn("tag_schema_version", original)
+
+    def test_generic_tag_can_define_reading_meaning_and_empty_allowlist(self):
+        config = journal.editable_tag_config(journal.load_config(journal.HERE / "config.json"))
+        config["tag_categories"] = {"Progress": {"prefix": "progress/", "color": "#123456", "selection_mode": "explicit",
+            "allowed_tags": ["progress/done"], "tags": {"progress/done": {"label": "Finished", "color": "#abcdef", "reading_role": "read"}}}}
+        validated = journal.validate_config(config)
+        self.assertEqual(journal.reading_status([{"tag": "progress/done"}], "P", validated)[0]["label"], "Finished")
+        config["tag_categories"]["Progress"]["allowed_tags"] = []
+        validated = journal.validate_config(config)
+        self.assertEqual(journal.categorized_tags([{"tag": "progress/done"}], validated["tag_categories"]), {})
+        self.assertEqual(validated["status_roles"]["read"]["tag"], "")
+
     def test_catalog_provides_collection_tree_and_effective_selection(self):
         config = journal.load_config(journal.HERE / "config.json")
         config["included_collections"] = ["ROOT"]

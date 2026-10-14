@@ -8,19 +8,17 @@
   <div class="settings-head"><h2 id="settings-heading">Settings</h2><button id="settings-close" class="secondary" type="button">Close</button></div>
   <div class="settings-content">
     <div id="settings-diagnostics" class="error"></div>
+    <section class="settings-section first-section"><div class="settings-section-head"><div><h3>Annotations</h3><p class="help">Colors, meanings, and descriptions.</p></div><button id="add-color" class="secondary" type="button">Add color</button></div><div id="setting-colors" class="editor-list"></div></section>
+    <section class="settings-section"><div class="settings-section-head"><div><h3>Tags</h3><p class="help">Category colors and individual tag colors. Any tag can carry a reading meaning.</p></div><button id="add-category" class="secondary" type="button">Add category</button></div><div id="setting-categories" class="editor-list"></div></section>
+    <section class="settings-section"><h3>Library scope</h3><div class="scope-grid"><section class="scope-panel"><h4>Collections</h4><div id="setting-collections" class="scope-list"></div></section><section class="scope-panel"><h4>Paper types</h4><div id="setting-types" class="scope-list"></div></section></div><label class="unfiled-setting"><input id="setting-unfiled" type="checkbox"> Include unfiled papers</label></section>
+    <section class="settings-section"><h3>Dates and timezone</h3>
     <div class="settings-grid">
       <label>From<input id="setting-from" type="date"></label>
       <label>To<input id="setting-to" type="date"></label>
       <div class="timezone-setting"><label for="setting-timezone">Timezone</label><input id="setting-timezone-search" type="search" placeholder="Find a city or region" aria-label="Search timezones"><select id="setting-timezone" required></select><span id="setting-timezone-count" class="small"></span></div>
       <label>Default window (days)<input id="setting-window" type="number" min="1"></label>
     </div>
-    <section class="settings-section"><h3>Collections and paper types</h3>
-      <div class="settings-grid"><div><div class="field-label">Included collections</div><p class="small">Checking a collection includes all its descendants. Unchecking one collection leaves its descendants as they are.</p><div id="setting-collections" class="collection-picker"></div></div><div><div class="field-label">Paper types</div><div id="setting-types" class="settings-list"></div><label class="unfiled-setting"><input id="setting-unfiled" type="checkbox"> Include unfiled papers</label></div></div>
     </section>
-    <section class="settings-section"><h3>Reading-status tags</h3><div id="setting-statuses" class="settings-grid"></div></section>
-    <section class="settings-section"><h3>Annotation colours</h3><div id="setting-colors"></div><button id="add-color" class="secondary" type="button">Add colour</button></section>
-    <section class="settings-section"><h3>Tag categories</h3><div id="setting-categories"></div><button id="add-category" class="secondary" type="button">Add category</button></section>
-    <div id="settings-error" class="error" role="alert"></div>
-    <div class="settings-actions"><button id="settings-cancel" class="secondary" type="button">Cancel</button><button id="settings-save" class="primary" type="button">Save settings</button></div>
   </div>
+  <div class="settings-footer"><div id="settings-error" class="error" role="alert"></div><div class="settings-actions"><button id="settings-cancel" class="secondary" type="button">Cancel</button><button id="settings-save" class="primary" type="button">Save settings</button></div></div>
 </dialog>

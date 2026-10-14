@@ -42,14 +42,64 @@ def load_config(path: Path | None = None) -> dict:
     return validate_config(json.loads((path or config_path()).read_text(encoding="utf-8")))
 
 
+def editable_tag_config(raw: dict) -> dict:
+    """Migrate legacy mappings for the unified editor without changing saved settings."""
+    config = copy.deepcopy(raw)
+    if config.get("tag_schema_version") == 2:
+        return config
+    config["tag_schema_version"] = 2
+    categories = config.setdefault("tag_categories", {})
+    for index, rule in enumerate(categories.values()):
+        rule.setdefault("color", ["#7b8db6", "#bd8d52", "#a17aa9", "#b86868"][index % 4])
+        rule.setdefault("description", "")
+        rule["selection_mode"] = "explicit" if rule.get("allowed_tags") else "prefix"
+        rule["tags"] = {tag: {"label": tag.rsplit("/", 1)[-1], "color": rule["color"], "description": ""}
+                        for tag in rule.get("allowed_tags", [])}
+    roles = config.get("status_roles", DEFAULT_STATUS_ROLES)
+    categories["Status"] = {"prefix": "status/", "color": "#4c87bd", "description": "Reading progress",
+                            "selection_mode": "explicit", "allowed_tags": [value["tag"] for value in roles.values()],
+                            "tags": {value["tag"]: {"label": value["label"], "color": value["color"],
+                                      "description": "", "reading_role": role}
+                                     for role, value in roles.items() if value["tag"]}}
+    return config
+
+
 def validate_config(raw: dict) -> dict:
     if not isinstance(raw, dict):
         raise ValueError("Configuration must be a JSON object")
     config = copy.deepcopy(raw)
     if not isinstance(config.get("tag_categories", {}), dict):
         raise ValueError("Tag categories must be an object")
-    # Older files carried status as a generic tag category; status_roles owns it now.
-    config.setdefault("tag_categories", {}).pop("Status", None)
+    unified = config.get("tag_schema_version") == 2
+    if not unified:
+        config.setdefault("tag_categories", {}).pop("Status", None)
+    else:
+        roles = {role: {**value, "tag": ""} for role, value in DEFAULT_STATUS_ROLES.items()}
+        assigned = set()
+        defined_tags = set()
+        for category, rule in config.get("tag_categories", {}).items():
+            if not isinstance(rule, dict) or not re.fullmatch(r"#[0-9a-fA-F]{6}", str(rule.get("color", ""))):
+                raise ValueError(f"Tag category {category!r} needs a hex color")
+            if rule.get("selection_mode") not in ("prefix", "explicit") or not isinstance(rule.get("tags", {}), dict):
+                raise ValueError(f"Invalid tag selection for {category!r}")
+            for tag, definition in rule.get("tags", {}).items():
+                if not isinstance(tag, str) or not tag.strip() or tag in defined_tags:
+                    raise ValueError("Tag names must be nonempty and unique")
+                defined_tags.add(tag)
+                if not tag.startswith(rule.get("prefix", "")):
+                    raise ValueError(f"Tag {tag!r} must start with its category prefix")
+                if not isinstance(definition, dict) or not isinstance(definition.get("label"), str) or not definition["label"].strip():
+                    raise ValueError(f"Tag {tag!r} needs a label")
+                if not re.fullmatch(r"#[0-9a-fA-F]{6}", str(definition.get("color", ""))):
+                    raise ValueError(f"Tag {tag!r} needs a hex color")
+                role = definition.get("reading_role", "")
+                if role:
+                    if role not in roles or role in assigned:
+                        raise ValueError("Assign each reading meaning to at most one tag")
+                    assigned.add(role)
+                    if rule["selection_mode"] == "prefix" or tag in rule.get("allowed_tags", []):
+                        roles[role] = {"tag": tag, "label": definition["label"], "color": definition["color"], "background": definition["color"] + "18"}
+        config["status_roles"] = roles
     roles = config.setdefault("status_roles", copy.deepcopy(DEFAULT_STATUS_ROLES))
     if not isinstance(roles, dict) or set(roles) != set(DEFAULT_STATUS_ROLES):
         raise ValueError("Status roles must be to_read, reading, read, and revisit")
@@ -59,13 +109,14 @@ def validate_config(raw: dict) -> dict:
         if not isinstance(value, dict):
             raise ValueError(f"Status role {role} must be an object")
         for field in ("tag", "label"):
-            if not isinstance(value.get(field), str) or not value[field].strip():
+            if not isinstance(value.get(field), str) or (not value[field].strip() and not (unified and field == "tag")):
                 raise ValueError(f"Status role {role} needs a nonempty {field}")
             value[field] = value[field].strip()
         for field in ("color", "background"):
-            if not re.fullmatch(r"#[0-9a-fA-F]{6}", str(value.get(field, ""))):
+            if not re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?" if unified and field == "background" else r"#[0-9a-fA-F]{6}", str(value.get(field, ""))):
                 raise ValueError(f"Status role {role} needs a hex {field}")
-        tags.append(value["tag"])
+        if value["tag"]:
+            tags.append(value["tag"])
     if len(set(tags)) != len(tags):
         raise ValueError("Status role tags must be distinct")
     if len({roles[role]["label"].casefold() for role in roles}) != len(roles):
@@ -81,7 +132,7 @@ def validate_config(raw: dict) -> dict:
     for label, rule in config.get("tag_categories", {}).items():
         if not isinstance(label, str) or not label.strip():
             raise ValueError("Tag category names must be nonempty")
-        if not isinstance(rule, dict) or not isinstance(rule.get("prefix"), str) or not rule["prefix"]:
+        if not isinstance(rule, dict) or not isinstance(rule.get("prefix"), str) or (not rule["prefix"] and not (unified and rule.get("selection_mode") == "explicit")):
             raise ValueError(f"Tag category {label!r} needs a prefix")
         if not isinstance(rule.get("allowed_tags", []), list) or any(not isinstance(tag, str) for tag in rule.get("allowed_tags", [])):
             raise ValueError(f"Tag category {label!r} needs a list of allowed tags")
@@ -214,11 +265,12 @@ def categorized_tags(tags: list[dict], categories: dict) -> dict[str, list[str]]
     for label, rule in categories.items():
         prefix = rule.get("prefix", "")
         allowed = set(rule.get("allowed_tags", []))
-        if not prefix:
+        if not prefix and rule.get("selection_mode") != "explicit":
             raise ValueError(f"Tag category {label!r} needs a non-empty prefix")
         matches = sorted(
             name for name in names
-            if name.startswith(prefix) and (not allowed or name in allowed)
+            if name.startswith(prefix) and (rule.get("selection_mode") == "prefix" or
+                (name in allowed if rule.get("selection_mode") == "explicit" else not allowed or name in allowed))
         )
         if matches:
             result[label] = matches
@@ -231,7 +283,7 @@ def reading_status(tags: list[dict], item_key: str, config: dict | None = None) 
     present = [role for role in ("to_read", "reading", "read") if roles[role]["tag"] in names]
     recognized = {value["tag"] for value in roles.values()}
     diagnostics = []
-    for tag in sorted(name for name in names if name.startswith("status/") and name not in recognized):
+    for tag in sorted(name for name in names if name.startswith("status/") and name not in recognized and (config or {}).get("tag_schema_version") != 2):
         hint = " (use status/to-read)" if tag == "status/to_read" and roles["to_read"]["tag"] == "status/to-read" else ""
         diagnostics.append(f"{item_key}: noncanonical status tag {tag}{hint}")
     if len(present) > 1:
@@ -384,9 +436,10 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
         status, status_diagnostics = reading_status(paper.get("tags") or [], paper["key"], config)
         diagnostics.extend(status_diagnostics)
         mapped_status_tags = sorted(role["tag"] for role in config["status_roles"].values() if role["tag"] in {t.get("tag") for t in paper.get("tags") or []})
-        tags.pop("Status", None)
-        if mapped_status_tags:
-            tags["Status"] = mapped_status_tags
+        if config.get("tag_schema_version") != 2:
+            tags.pop("Status", None)
+            if mapped_status_tags:
+                tags["Status"] = mapped_status_tags
         membership_keys = sorted(
             (key for key in paper.get("collections") or []
              if key in active_collection_keys and (selected is None or key in selected)),
@@ -445,6 +498,15 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
         for entry in collections if selected is None or entry["key"] in selected
     ]
     collection_list.sort(key=lambda c: c["path"])
+    tag_styles = {}
+    editable = editable_tag_config(config)
+    actual_tags = [{"tag": tag} for paper in inventory for values in paper["tags"].values() for tag in values]
+    actual_tags.extend({"tag": tag} for entry in journal_entries for tag in entry["tags"])
+    for label, rule in sorted(editable["tag_categories"].items(), key=lambda pair: len(pair[1]["prefix"])):
+        for tag in categorized_tags(actual_tags, {label: rule}).get(label, []):
+            definition = rule.get("tags", {}).get(tag, {})
+            tag_styles[tag] = {"label": definition.get("label") or tag.rsplit("/", 1)[-1],
+                               "color": definition.get("color", rule["color"]), "category_color": rule["color"], "category": label}
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "timezone": str(tz),
@@ -458,6 +520,7 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
         ],
         "color_legend": color_legend,
         "status_roles": config["status_roles"],
+        "tag_styles": tag_styles,
         "default_groupers": config["default_groupers"],
         "collections": collection_list,
         "inventory": inventory,
@@ -515,6 +578,7 @@ def render_html(report: dict, *, app_config: dict | None = None, app_catalog: di
         "__APP_TOKEN__": safe_json(app_token),
         "__APP_CONTROLS__": controls,
         "__JOURNAL_JS__": (HERE / "report-ui.js").read_text(encoding="utf-8"),
+        "__TREE_JS__": (HERE / "tree-picker.js").read_text(encoding="utf-8"),
         "__APP_JS__": app_js,
     }
     # Substitute once so a Zotero title matching a template marker stays ordinary data.

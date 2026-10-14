@@ -15,6 +15,7 @@ build_dir="$(mktemp -d "${TMPDIR:-/tmp/}reading-journal-build.XXXXXX")"
   --specpath "$build_dir" \
   --add-data "$project_dir/template.html:." \
   --add-data "$project_dir/report-ui.js:." \
+  --add-data "$project_dir/tree-picker.js:." \
   --add-data "$project_dir/app-ui.js:." \
   --add-data "$project_dir/app-controls.html:." \
   --add-data "$project_dir/config.json:." \

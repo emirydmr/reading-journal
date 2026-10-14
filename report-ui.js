@@ -16,6 +16,17 @@ let activeGroupers = new Set(data.default_groupers);
 let visibleRange = {...data.range};
 let visibleData;
 let selectedSizeDate = data.range.to;
+const tagSelections=new Map();
+function matchesTagSelection(id,tags){const selection=tagSelections.get(id);return selection==null||tags.some(tag=>selection.has(tag));}
+function tagChip(tag){const chip=el('span','status-tag tag-chip',tag),style=data.tag_styles?.[tag];if(style){chip.title=style.category+' · '+style.label;chip.style.setProperty('--category-color',style.category_color);chip.style.setProperty('--tag-color',style.color);chip.style.setProperty('--tag-bg',style.color+'18');}return chip;}
+function renderTagFilter(id,names,render){
+  const host=$(id),details=el('details','tag-filter'),summary=el('summary'),body=el('div','tag-filter-popover'),tree=el('div');host.replaceChildren();
+  let selected=tagSelections.get(id);if(selected)selected=new Set([...selected].filter(tag=>names.has(tag)));tagSelections.set(id,selected);
+  const updateLabel=()=>summary.textContent=tagSelections.get(id)==null?'All tags':`${tagSelections.get(id).size} tags selected`;
+  const all=el('button','secondary','All tags');all.type='button';all.addEventListener('click',()=>{tagSelections.set(id,null);renderTagFilter(id,names,render);render();});body.append(all,tree);
+  const nodes=tagTreeNodes([...names]).map(node=>{const style=data.tag_styles?.[node.key]||Object.entries(data.tag_styles||{}).find(([name])=>node.key.startsWith('@')&&name.startsWith(node.key.slice(1)+'/'))?.[1];return {...node,color:node.key.startsWith('@')?style?.category_color:style?.color};});renderChoiceTree(tree,nodes,selected||new Set(nodes.map(node=>node.key)),keys=>{tagSelections.set(id,new Set([...keys].filter(key=>names.has(key))));updateLabel();render();});
+  if(!names.size)tree.append(el('p','small','No tags in this range.'));details.append(summary,body);host.append(details);updateLabel();
+}
 
 const inRange = (day, range) => Boolean(day) && range.from <= day && day <= range.to;
 function annotationInRange(entry, range) {
@@ -173,15 +184,15 @@ function paperRow(paper) {
   const row=el('div','paper-row'),paint=statusPaint(paper);row.style.setProperty('--status-color',paint[0]);row.style.setProperty('--status-bg',paint[1]);
   const count=visibleData.annotationCounts.get(paper.key)||0;
   const main=el('div');main.append(paperLink(paper.title,paper.resource_link),el('span','paper-meta',`${paper.creators.slice(0,2).join(', ')||'Unknown author'} · added ${fmt(paper.date_added)} · ${count} annotation${count===1?'':'s'} in range`));
-  const tags=el('div','status-tags');(paper.status_tags.length?paper.status_tags:['No status']).forEach(tag=>tags.append(el('span','status-tag',tag)));row.append(main,tags);return row;
+  const tags=el('div','status-tags'),names=[...new Set(Object.values(paper.tags).flat())];if(names.length)names.forEach(tag=>tags.append(tagChip(tag)));else tags.append(el('span','status-tag','No tags'));row.append(main,tags);return row;
 }
 function renderStatusSummary() {
   const host=$('status-summary');host.replaceChildren();
   const roles=data.status_roles;
   const values=[
     ['new','New',paper=>visibleData.addedPaperKeys.has(paper.key),'#1e7464','#eaf4ed'],
-    ...['to_read','reading','read'].map(role=>[role,roles[role].label,paper=>paper.status.label===roles[role].label,roles[role].color,roles[role].background]),
-    ['revisit',roles.revisit.label,paper=>paper.status.revisit,roles.revisit.color,roles.revisit.background],
+    ...['to_read','reading','read'].filter(role=>roles[role].tag).map(role=>[role,roles[role].label,paper=>paper.status.label===roles[role].label,roles[role].color,roles[role].background]),
+    ...(roles.revisit.tag?[['revisit',roles.revisit.label,paper=>paper.status.revisit,roles.revisit.color,roles.revisit.background]]:[]),
     ['unassigned','Unassigned',paper=>paper.status.label==='Unassigned','#aab5af','#f7f8f6'],
     ['conflicting','Conflicts',paper=>paper.status.label==='Conflicting statuses','#bc6464','#fcf1f0']
   ];
@@ -194,7 +205,7 @@ function renderInventory() {
   const query=$('inventory-search').value.toLocaleLowerCase(),filter=$('inventory-filter').value,sort=$('inventory-sort').value,tag=$('inventory-tag').value;
   const visible=visibleData.inventory.filter(paper=>{
     if(query&&![paper.title,...paper.creators].join(' ').toLocaleLowerCase().includes(query))return false;
-    if(tag&&!Object.values(paper.tags).flat().includes(tag))return false;
+    if(!matchesTagSelection('inventory-tag',Object.values(paper.tags).flat()))return false;
     if(filter==='new')return visibleData.addedPaperKeys.has(paper.key);
     if(filter==='active')return visibleData.annotatedPaperKeys.has(paper.key);
     if(filter==='revisit')return paper.status.revisit;
@@ -225,7 +236,7 @@ function renderInventory() {
   if(!host.childNodes.length)host.append(el('div','panel empty','No collections in scope.'));
 }
 function openCollection(keys) {
-  $('inventory-search').value='';$('inventory-filter').value='all';$('inventory-tag').value='';renderInventory();activateView('dashboard',false);
+  $('inventory-search').value='';$('inventory-filter').value='all';tagSelections.set('inventory-tag',null);refreshFilterOptions();renderInventory();activateView('dashboard',false);
   const nodes=[...$('collection-tree').querySelectorAll('details.collection-node')];
   keys.forEach(key=>{let node=nodes.find(candidate=>candidate.dataset.key===key);while(node){node.open=true;node=node.parentElement?.closest('details.collection-node');}});
   const first=nodes.find(node=>node.dataset.key===keys[0]);if(first)first.scrollIntoView({behavior:'smooth',block:'start'});
@@ -233,7 +244,7 @@ function openCollection(keys) {
 
 function renderFeed() {
   const query=$('feed-search').value.toLocaleLowerCase(),type=$('feed-type').value,collection=$('feed-collection').value,tag=$('feed-tag').value;
-  const visible=visibleData.activity.filter(event=>(!type||event.type===type)&&(!collection||event.collections.includes(collection))&&(!tag||Object.values(event.tags).flat().includes(tag)||(event.annotation_tags||[]).includes(tag))&&(!query||[event.paper_title,...event.creators,event.category||''].join(' ').toLocaleLowerCase().includes(query)));
+  const visible=visibleData.activity.filter(event=>(!type||event.type===type)&&(!collection||event.collections.includes(collection))&&matchesTagSelection('feed-tag',[...Object.values(event.tags).flat(),...(event.annotation_tags||[])])&&(!query||[event.paper_title,...event.creators,event.category||''].join(' ').toLocaleLowerCase().includes(query)));
   $('feed-result').textContent=`${visible.length} of ${visibleData.activity.length} events visible`;const host=$('feed-list');host.replaceChildren();
   if(!visible.length){host.append(el('div','panel empty','No activity matches these filters.'));return;}
   const groups=new Map();visible.forEach(event=>{const key=event.collection_group;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(event);});
@@ -256,7 +267,7 @@ function annotationCard(entry) {
   card.append(el('div','paper-meta',`Current status: ${entry.status_group} · Current collection: ${entry.collection_group} · p. ${entry.page}`));
   if(entry.text){card.append(el('div','paper-meta','Highlighted source text'),el('blockquote','',entry.text));}
   if(entry.comment){card.append(el('div','paper-meta','Annotation comment'),el('p','comment',entry.comment));}
-  if(entry.tags.length)card.append(el('div','paper-meta',`Annotation tags: ${entry.tags.join(', ')}`));
+  if(entry.tags.length){const tags=el('div','status-tags');entry.tags.forEach(tag=>tags.append(tagChip(tag)));card.append(tags);}
   return card;
 }
 function groupValue(entry,dimension) {
@@ -302,7 +313,7 @@ function renderGroupers() {
 }
 function renderJournal() {
   const query=$('journal-search').value.toLocaleLowerCase(),category=$('journal-category').value,collection=$('journal-collection').value,tag=$('journal-tag').value;
-  const visible=visibleData.journal.filter(entry=>(!category||entry.category===category)&&(!collection||entry.collections.includes(collection))&&(!tag||entry.tags.includes(tag)||Object.values(entry.paper_tags).flat().includes(tag))&&(!query||[entry.paper_title,entry.text,entry.comment,...entry.creators].join(' ').toLocaleLowerCase().includes(query)));
+  const visible=visibleData.journal.filter(entry=>(!category||entry.category===category)&&(!collection||entry.collections.includes(collection))&&matchesTagSelection('journal-tag',[...entry.tags,...Object.values(entry.paper_tags).flat()])&&(!query||[entry.paper_title,entry.text,entry.comment,...entry.creators].join(' ').toLocaleLowerCase().includes(query)));
   $('journal-result').textContent=`${visible.length} of ${visibleData.journal.length} annotations visible`;const host=$('journal-list');host.replaceChildren();
   if(!visible.length){host.append(el('div','panel empty','No annotations match these filters.'));return;}
   const dimensions=groupOrder.filter(group=>activeGroupers.has(group));
@@ -328,9 +339,9 @@ function refreshFilterOptions() {
   visibleData.inventory.forEach(paper=>{paper.collections.forEach(name=>collections.add(name));Object.values(paper.tags).flat().forEach(tag=>paperTags.add(tag));});
   visibleData.journal.forEach(entry=>{categories.add(entry.category);entry.tags.forEach(tag=>annotationTags.add(tag));});
   setOptions('feed-collection',collections,'All collections');setOptions('journal-collection',collections,'All collections');
-  setOptions('inventory-tag',paperTags,'All tags');
-  setOptions('feed-tag',new Set([...paperTags,...annotationTags]),'All tags');
-  setOptions('journal-tag',new Set([...paperTags,...annotationTags]),'All tags');
+  renderTagFilter('inventory-tag',paperTags,renderInventory);
+  renderTagFilter('feed-tag',new Set([...paperTags,...annotationTags]),renderFeed);
+  renderTagFilter('journal-tag',new Set([...paperTags,...annotationTags]),renderJournal);
   setOptions('journal-category',categories,'All categories');
 }
 
@@ -367,7 +378,7 @@ $('range-close').addEventListener('click',()=>rangeDialog.close());
 $('range-cancel').addEventListener('click',()=>rangeDialog.close());
 $('range-reset').addEventListener('click',()=>applyRange(data.range.from,data.range.to));
 $('range-form').addEventListener('submit',event=>{event.preventDefault();applyRange($('range-from').value,$('range-to').value);});
-for(const role of ['to_read','reading','read','revisit'])$('inventory-filter').querySelector(`option[value="${role}"]`).textContent=data.status_roles[role].label;
+for(const role of ['to_read','reading','read','revisit']){const item=$('inventory-filter').querySelector(`option[value="${role}"]`);item.textContent=data.status_roles[role].label;item.hidden=!data.status_roles[role].tag;}
 drawLegend();renderGroupers();renderVisibleRange();
 $('growth-resolution').addEventListener('change',drawGrowth);
 $('growth-date').addEventListener('change',()=>{const chosen=$('growth-date').value;if(chosen<visibleRange.from||chosen>visibleRange.to)return;selectedSizeDate=chosen;drawGrowth();const distribution=sizePieAt(selectedSizeDate);drawPie(distribution.pie,distribution.multiMembership);});

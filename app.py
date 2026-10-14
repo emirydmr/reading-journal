@@ -37,6 +37,15 @@ def make_catalog(items: list[dict], collections: list[dict], tags: list[dict], c
     types = {entry["data"].get("itemType", "") for entry in items if not entry["data"].get("parentItem")}
     types |= set(config.get("paper_types", []))
     timezones = sorted(available_timezones() | {config.get("timezone", "Asia/Shanghai")})
+    categories = journal.editable_tag_config(config)["tag_categories"]
+    names = {entry.get("tag", "") for entry in tags if entry.get("tag")}
+    unmatched = sorted(tag for tag in names if not any(rule["prefix"] and tag.startswith(rule["prefix"]) for rule in categories.values()))
+    if unmatched and not any(not rule["prefix"] for rule in categories.values()):
+        name = "Uncategorized"
+        while name in categories:
+            name += " tags"
+        categories[name] = {"prefix": "", "color": "#7b9185", "description": "", "selection_mode": "explicit", "allowed_tags": [],
+                            "tags": {tag: {"label": tag, "color": "#7b9185", "description": ""} for tag in unmatched}}
     return {
         "collections": [
             {"key": entry["key"], "name": entry["data"].get("name") or entry["key"],
@@ -47,6 +56,7 @@ def make_catalog(items: list[dict], collections: list[dict], tags: list[dict], c
         "paper_types": sorted(name for name in types if name and name not in ("annotation", "attachment", "note")),
         "tags": sorted({entry.get("tag", "") for entry in tags if entry.get("tag")}),
         "timezones": timezones,
+        "tag_categories": categories,
         "diagnostics": diagnostics,
     }
 
@@ -130,7 +140,7 @@ def handler_factory(token: str):
                 if size <= 0 or size > 1_000_000:
                     raise ValueError("Invalid settings size")
                 payload = json.loads(self.rfile.read(size))
-                if "Status" in payload["config"].get("tag_categories", {}):
+                if payload["config"].get("tag_schema_version") != 2 and "Status" in payload["config"].get("tag_categories", {}):
                     raise ValueError("Status is reserved for reading-status tags")
                 config = journal.validate_config(payload["config"])
                 if not config.get("included_collections"):
