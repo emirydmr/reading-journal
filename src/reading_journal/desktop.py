@@ -1,4 +1,4 @@
-"""Small native macOS control window for the journal's local browser interface."""
+"""Native macOS window for the reading journal."""
 
 from __future__ import annotations
 
@@ -13,10 +13,10 @@ def run_window(url, stop, stopped):
     import objc
     from Cocoa import (
         NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
-        NSButton, NSColor, NSFont, NSImage, NSMakeRect, NSMenu, NSMenuItem, NSObject, NSAppearance, NSAppearanceNameAqua,
+        NSImage, NSMakeRect, NSMenu, NSMenuItem, NSObject, NSAppearance, NSAppearanceNameAqua,
         NSBundle,
         NSURL, NSURLRequest, NSSavePanel, NSModalResponseOK, NSAlert, NSWorkspace,
-        NSTextField, NSTimer, NSTerminateNow, NSWindow,
+        NSTimer, NSTerminateNow, NSWindow,
         NSWindowStyleMaskTitled, NSWindowStyleMaskClosable, NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
     )
     from WebKit import WKWebView, WKWebViewConfiguration
@@ -42,6 +42,7 @@ def run_window(url, stop, stopped):
                 journal_window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(NSMakeRect(0, 0, 1180, 780), style, NSBackingStoreBuffered, False)
                 journal_window.setTitle_("Journal — Reading Journal")
                 journal_window.setReleasedWhenClosed_(False)
+                journal_window.setDelegate_(self)
                 journal_window.setMinSize_((700, 480))
                 journal_window.setAppearance_(NSAppearance.appearanceNamed_(NSAppearanceNameAqua))
                 journal_view = WKWebView.alloc().initWithFrame_configuration_(journal_window.contentView().bounds(), WKWebViewConfiguration.alloc().init())
@@ -90,10 +91,6 @@ def run_window(url, stop, stopped):
             return None
 
         @objc.IBAction
-        def openBrowser_(self, sender):
-            webbrowser.open_new_tab(url)
-
-        @objc.IBAction
         def quitJournal_(self, sender):
             stop()
             application.terminate_(None)
@@ -123,41 +120,8 @@ def run_window(url, stop, stopped):
     menu.addItem_(app_item)
     application.setMainMenu_(menu)
 
-    style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
-    window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(NSMakeRect(0, 0, 480, 235), style, NSBackingStoreBuffered, False)
-    window.setTitle_("Reading Journal")
-    window.setReleasedWhenClosed_(False)
-    window.setDelegate_(delegate)
-    window.setAppearance_(NSAppearance.appearanceNamed_(NSAppearanceNameAqua))
-    window.setBackgroundColor_(NSColor.colorWithCalibratedRed_green_blue_alpha_(0.96, 0.97, 0.95, 1))
-    view = window.contentView()
-
-    def text(value, rect, size, bold=False):
-        label = NSTextField.labelWithString_(value)
-        label.setFrame_(NSMakeRect(*rect))
-        label.setFont_(NSFont.boldSystemFontOfSize_(size) if bold else NSFont.systemFontOfSize_(size))
-        label.setTextColor_(NSColor.colorWithCalibratedRed_green_blue_alpha_(0.09, 0.24, 0.22, 1))
-        view.addSubview_(label)
-
-    text("Reading Journal", (28, 164, 424, 34), 25, True)
-    text("Your journal is running.", (28, 128, 424, 25), 15)
-    text("View reports and edit settings in the journal or browser.\nClosing this control window quits the app.", (28, 76, 424, 45), 12)
-    for title, action, rect in [
-        ("Open Journal", "openJournal:", (20, 24, 150, 36)),
-        ("Open in Browser", "openBrowser:", (174, 24, 170, 36)),
-        ("Quit", "quitJournal:", (360, 24, 95, 36)),
-    ]:
-        button = NSButton.buttonWithTitle_target_action_(title, delegate, action)
-        button.setFrame_(NSMakeRect(*rect))
-        button.setBezelStyle_(1)
-        button.setBordered_(True)
-        if title == "Open Journal":
-            button.setKeyEquivalent_("\r")
-        view.addSubview_(button)
     timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(0.25, delegate, "checkServer:", None, True)
-    window.center()
-    window.makeKeyAndOrderFront_(None)
-    application.activateIgnoringOtherApps_(True)
+    delegate.openJournal_(None)
     try:
         application.run()
     finally:
