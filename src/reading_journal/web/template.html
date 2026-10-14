@@ -67,7 +67,7 @@
     .settings-grid textarea { min-height: 90px; padding-block: 8px; resize: vertical; }
     .timezone-setting .small { display: block; margin-top: 4px; font-weight: 400; }
     .controls :focus-visible,.settings-grid :focus-visible,button:focus-visible { outline: 3px solid #9fddc4; outline-offset: 1px; }
-    .result-line { margin: 8px 0 14px; }
+    .result-line { display: inline-block; min-width: 27ch; margin: 8px 0 14px; font-variant-numeric: tabular-nums; }
     .status-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
     .status-summary button { min-height: var(--control-height); border: 1px solid var(--status-color,#b6c4bb); border-radius: var(--control-radius); background: var(--status-bg,#fff); color: #24443b; padding: 0 10px; font-size: .78rem; font-weight: 700; }
     .status-summary button:hover { filter: brightness(.96); }
@@ -231,7 +231,7 @@
     .filter-all[aria-pressed="true"] { border-color: #80b49a; background: #e5f3e9; }
     .filter-all-mark { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid #a5baac; border-radius: 6px; color: transparent; background: white; }
     .filter-all[aria-pressed="true"] .filter-all-mark { border-color: #1e7464; background: #1e7464; color: white; }
-    .filter-all-count { margin-left: auto; color: #698076; font-weight: 500; }
+    .filter-all-count { min-width: 2ch; margin-left: auto; color: #698076; font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
     .tag-filter-popover .choice-leaf:hover,.tag-filter-popover .choice-branch > summary:hover { background: #f4f8f4; }
     .tag-chip { border-left: 4px solid var(--category-color,#7b9185); background: var(--tag-bg,#edf3ee); color: #284439; }
     .tag-chip::before { content: ''; display: inline-block; width: 8px; height: 8px; background: var(--tag-color,#7b9185); border-radius: 50%; margin-right: 5px; }
