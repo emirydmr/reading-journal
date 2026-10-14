@@ -282,7 +282,10 @@ function renderFeed() {
       const subject=el('div','event-subject');subject.append(paperLink(event.paper_title,event.resource_link));main.append(kind,subject);
       if(event.category){const category=el('span','badge event-category',event.category);if(validColor(event.color))category.style.setProperty('--annotation-color',event.color);main.append(category);}
       const side=el('div','event-side'),state=el('span','small',`Now: ${event.status_group}`),actions=el('div','event-actions');
-      if(event.type!=='Paper added'){const annotationOpen=eventAction(event.zotero_link,'Open current annotation in Zotero','annotation');if(annotationOpen)actions.append(annotationOpen);}
+      if(event.type!=='Paper added'){
+        const annotationOpen=eventAction(event.zotero_link,'Open annotation in Zotero’s PDF reader · right-click for journal entry','annotation');
+        if(annotationOpen){annotationOpen.addEventListener('contextmenu',rightClick=>{rightClick.preventDefault();openJournalEntry(event.key.slice('annotation:'.length));});actions.append(annotationOpen);}
+      }
       const paperOpen=eventAction(event.paper_zotero_link||event.zotero_link,'Open paper in Zotero','paper');if(paperOpen)actions.append(paperOpen);
       side.append(state);if(actions.childNodes.length)side.append(actions);row.append(time,main,side);list.append(row);
     });section.append(list);host.append(section);
@@ -290,14 +293,30 @@ function renderFeed() {
 }
 
 function annotationCard(entry) {
-  const card=el('article','journal-entry');card.dataset.refreshKey=`annotation:${entry.key}`;if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);
-  const top=el('div','journal-top'),title=el('div');title.append(paperLink(entry.paper_title,entry.resource_link));const paperOpen=zoteroButton(entry.paper_zotero_link,'Open paper in Zotero');if(paperOpen)title.append(paperOpen);const annotationOpen=zoteroButton(entry.zotero_link,'Open this annotation in Zotero','Annotation ↗');if(annotationOpen)title.append(annotationOpen);title.append(el('span','badge',entry.category));
-  top.append(title,el('span','small',`${entry.event_type} · ${fmt(entry.event_at)}`));card.append(top);
+  const card=el('article','journal-entry');card.dataset.refreshKey=`annotation:${entry.key}`;card.tabIndex=-1;if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);
+  const top=el('div','journal-top'),heading=el('div','journal-heading'),category=el('span','badge event-category',entry.category),actions=el('div','event-actions journal-actions');
+  heading.append(paperLink(entry.paper_title,entry.resource_link));if(validColor(entry.color))category.style.setProperty('--annotation-color',entry.color);
+  const categoryLine=el('div');categoryLine.append(category);heading.append(categoryLine);
+  const annotationOpen=eventAction(entry.zotero_link,'Open annotation in Zotero’s PDF reader','annotation');if(annotationOpen)actions.append(annotationOpen);
+  const paperOpen=eventAction(entry.paper_zotero_link,'Open paper in Zotero','paper');if(paperOpen)actions.append(paperOpen);
+  top.append(heading,actions);card.append(top,el('div','paper-meta',`${entry.event_type} · ${fmt(entry.event_at)}`));
   card.append(el('div','paper-meta',`Current status: ${entry.status_group} · Current collection: ${entry.collection_group} · p. ${entry.page}`));
   if(entry.text){card.append(el('div','paper-meta','Highlighted source text'),el('blockquote','',entry.text));}
   if(entry.comment){card.append(el('div','paper-meta','Annotation comment'),el('p','comment',entry.comment));}
   if(entry.tags.length){const tags=el('div','status-tags');entry.tags.forEach(tag=>tags.append(tagChip(tag)));card.append(tags);}
   return card;
+}
+function openJournalEntry(key){
+  const findCard=()=>[...$('journal-list').querySelectorAll('.journal-entry')].find(node=>node.dataset.refreshKey===`annotation:${key}`);
+  if(!findCard()){
+    $('journal-search').value='';$('journal-category').value='';$('journal-collection').value='';tagSelections.set('journal-tag',null);
+    renderTagFilter('journal-tag',new Set([...visibleData.journal.flatMap(entry=>[...entry.tags,...Object.values(entry.paper_tags).flat()])]),renderJournal);
+    renderJournal();
+  }
+  const card=findCard();
+  if(!card)return;
+  for(let parent=card.parentElement;parent;parent=parent.parentElement)if(parent.matches('details.journal-group'))parent.open=true;
+  activateView('journal',false);card.scrollIntoView({block:'center',behavior:'auto'});card.focus({preventScroll:true});
 }
 function groupValue(entry,dimension) {
   if(dimension==='paper')return [entry.paper_key,entry.paper_title];

@@ -131,7 +131,10 @@
     .journal-group > summary { cursor: pointer; padding: 10px 13px; font-weight: 700; color: #244f43; }
     .journal-group-body { padding: 0 11px 10px 15px; }
     .journal-entry { border-left: 5px solid var(--annotation-color,#aab3af); background: #fafbf9; padding: 13px 16px; border-radius: 0 9px 9px 0; margin: 8px 0; }
-    .journal-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .journal-top { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: start; }
+    .journal-heading { min-width: 0; }
+    .journal-actions { align-self: start; }
+    .journal-entry:focus { outline: 2px solid #8cbda6; outline-offset: 2px; }
     .journal-entry blockquote { white-space: pre-wrap; margin: 9px 0 15px; color: #687770; font-size: .89rem; font-style: italic; line-height: 1.55; }
     .journal-entry .comment { white-space: pre-wrap; margin: 7px 0; color: #294b40; font-weight: 500; }
     .empty { text-align: center; padding: 37px 20px; color: #65736e; }
