@@ -5,6 +5,13 @@
   "paper_types": ["journalArticle", "conferencePaper", "preprint", "book", "bookSection", "report", "thesis", "manuscript"],
   "default_window_days": 30,
   "timezone": "Asia/Shanghai",
+  "default_groupers": ["status", "paper", "category"],
+  "status_roles": {
+    "to_read": {"tag": "status/to-read", "label": "To read", "color": "#87958d", "background": "#f3f5f2"},
+    "reading": {"tag": "status/reading", "label": "Reading", "color": "#4c87bd", "background": "#edf5fb"},
+    "read": {"tag": "status/read", "label": "Read", "color": "#4c9a68", "background": "#edf8f0"},
+    "revisit": {"tag": "status/revisit", "label": "Revisit", "color": "#dd9950", "background": "#fff5eb"}
+  },
   "annotation_colors": {
     "#ffd400": {"label": "Important information", "description": "Definitions, claims, explanations, findings, and conclusions worth revisiting."},
     "#ff6666": {"label": "Criticism and disagreement", "description": "Questionable assumptions, methodological weaknesses, unsupported claims, and disagreements."},
@@ -14,7 +21,6 @@
     "#f19837": {"label": "Methods and technical details", "description": "Algorithms, architectures, formulations, datasets, experimental designs, and evaluation metrics."}
   },
   "tag_categories": {
-    "Status": {"prefix": "status/", "allowed_tags": ["status/to-read", "status/reading", "status/read", "status/revisit"]},
     "Approach": {"prefix": "approach/", "allowed_tags": ["approach/modeling", "approach/control", "approach/testing"]},
     "Method": {"prefix": "method/", "allowed_tags": ["method/simulation", "method/testing", "method/verification", "method/validation", "method/scenario-generation"]},
     "Meeting": {"prefix": "meeting/", "allowed_tags": ["meeting/discuss"]},

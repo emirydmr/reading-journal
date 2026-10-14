@@ -5,324 +5,214 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reading Journal</title>
   <style>
-    :root { font: 16px/1.55 system-ui, -apple-system, sans-serif; color: #20263a; background: #f5f6f3; }
+    :root { font: 16px/1.5 system-ui,-apple-system,sans-serif; color: #202b36; background: #f5f6f3; --control-height: 40px; --control-radius: 8px; }
     * { box-sizing: border-box; }
     body { margin: 0; }
-    a { color: #17645d; text-decoration-thickness: 1px; text-underline-offset: 2px; }
-    button, input, select { font: inherit; }
-    .wrap { max-width: 1180px; margin: auto; padding: 0 24px; }
-    header { color: #f9f8f4; background: #173d39; padding: 42px 0 38px; }
-    header h1 { font: 700 clamp(2.2rem, 5vw, 4rem)/1.1 Georgia, serif; letter-spacing: -.04em; margin: 0 0 12px; }
-    header p { max-width: 700px; margin: 0; color: #d4e6df; }
-    .eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: .72rem; font-weight: 700; margin-bottom: 12px; color: #a7dcc5; }
-    main { padding-top: 28px !important; padding-bottom: 80px !important; }
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
-    .stat, .panel, .entry { background: white; border: 1px solid #e2e6df; border-radius: 15px; box-shadow: 0 3px 16px #18352a0a; }
-    .stat { padding: 19px 22px; }
-    .stat strong { display: block; font: 700 2.1rem/1.1 Georgia, serif; color: #173d39; }
-    .stat span { color: #5f696a; font-size: .88rem; }
-    .charts { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; }
-    .panel { padding: 24px; min-width: 0; }
-    h2 { font: 700 1.4rem/1.2 Georgia, serif; margin: 0 0 7px; }
-    .help { font-size: .85rem; color: #697477; margin: 0 0 14px; }
+    button,input,select,textarea { font: inherit; }
+    button { cursor: pointer; }
+    a { color: #17645d; text-underline-offset: 2px; }
+    .wrap { max-width: 1180px; margin: auto; padding-inline: 24px; }
+    .site-header { position: sticky; z-index: 20; top: 0; background: #173d39; color: white; box-shadow: 0 4px 14px #102d2926; }
+    .header-inner { min-height: 68px; display: flex; align-items: center; gap: 22px; }
+    .brand { display: flex; flex-direction: column; flex: 0 0 auto; line-height: 1.15; }
+    .brand strong { font: 700 1.32rem Georgia,serif; letter-spacing: -.025em; }
+    .range-toggle { align-self: flex-start; color: #b7d9cd; background: transparent; border: 0; padding: 0; margin-top: 3px; font-size: .74rem; line-height: 1.25; text-align: left; }
+    .range-toggle:hover { color: white; text-decoration: underline; }
+    .site-nav { display: flex; align-items: center; gap: 4px; flex: 1; }
+    .site-nav button,.header-actions button { display: inline-flex; align-items: center; justify-content: center; min-height: var(--control-height); color: #d5e8dd; background: transparent; border: 0; border-radius: var(--control-radius); padding: 0 11px; white-space: nowrap; font-size: .84rem; font-weight: 700; }
+    .site-nav button[aria-current="page"],.site-nav button:hover,.header-actions button:hover { background: #2d6154; color: white; }
+    .header-actions { display: flex; gap: 3px; align-items: center; }
+    main { padding-block: 28px 80px; }
+    .view[hidden] { display: none; }
+    .page-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 19px; }
+    h1 { font: 700 clamp(1.9rem,4vw,2.65rem)/1.16 Georgia,serif; letter-spacing: -.035em; margin: 0; color: #173d39; }
+    h2 { font: 700 1.4rem/1.2 Georgia,serif; margin: 0 0 8px; }
+    h3 { font: 700 1.12rem/1.25 Georgia,serif; margin: 0; }
+    .small,.help,.result-line { color: #65736e; font-size: .82rem; }
+    .help { margin: 0 0 12px; }
+    .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 19px; }
+    .stat,.panel { background: white; border: 1px solid #e0e6df; border-radius: 15px; box-shadow: 0 3px 16px #18352a0a; }
+    .stat { padding: 17px 21px; }
+    .stat strong { display: block; color: #173d39; font: 700 2.08rem/1.1 Georgia,serif; }
+    .stat span { color: #5f696a; font-size: .85rem; }
+    .panel { padding: 23px; min-width: 0; }
+    .charts { display: grid; grid-template-columns: 1fr; gap: 16px; }
     svg { max-width: 100%; height: auto; }
-    .chart-empty { color: #75817d; padding: 70px 0; text-align: center; }
-    .pie-layout { display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 16px; }
-    .legend { list-style: none; padding: 0; margin: 0; font-size: .82rem; max-height: 210px; overflow: auto; }
-    .legend li { display: flex; gap: 9px; margin: 7px 0; align-items: start; }
-    .dot { flex: 0 0 11px; height: 11px; margin-top: 5px; border-radius: 50%; }
-    .legend span:last-child { overflow-wrap: anywhere; }
-    .section-title { margin: 36px 0 15px; }
-    .view-tabs { display: flex; gap: 8px; margin: 35px 0 16px; border-bottom: 1px solid #dce6df; }
-    .view-tab { border: 0; border-radius: 9px 9px 0 0; background: transparent; color: #536760; padding: 11px 17px; cursor: pointer; font-weight: 700; }
-    .view-tab[aria-selected="true"] { color: #173d39; background: #e3efe8; }
-    .view-panel[hidden] { display: none; }
-    .view-heading { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin: 10px 0 14px; }
-    .view-heading h2 { margin: 0; }
-    .feed-group { margin: 24px 0 30px; }
-    .feed-group h3 { font: 700 1.22rem/1.3 Georgia, serif; margin: 0 0 11px; }
-    .feed-collection { margin: 11px 0 20px; }
-    .collection-jump { border: 0; background: transparent; color: #17645d; cursor: pointer; padding: 4px 0; font-weight: 700; text-align: left; }
-    .collection-jump:hover { text-decoration: underline; }
-    .feed-collection .entry { margin-top: 8px; }
-    .collection-tree { max-height: 75vh; overflow-y: auto; padding-right: 4px; }
-    .collection-node { border: 1px solid #dfe7df; border-radius: 11px; background: white; margin: 9px 0; }
-    .collection-node > summary { cursor: pointer; padding: 13px 16px; font-weight: 700; color: #244f43; }
+    #growth-chart svg { display: block; width: 100%; cursor: crosshair; }
+    #growth-chart svg:focus-visible { outline: 3px solid #9fddc4; border-radius: 6px; }
+    .chart-head { display: flex; justify-content: space-between; align-items: start; gap: 16px; flex-wrap: wrap; }
+    .chart-controls { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .chart-controls label { color: #53615e; font-size: .76rem; font-weight: 700; }
+    .chart-controls select,.chart-controls input { display: block; height: var(--control-height); border: 1px solid #ccd8d2; border-radius: var(--control-radius); padding: 0 10px; background: white; color: #20312d; margin-top: 5px; }
+    .chart-total { color: #173d39; font: 700 1.18rem Georgia,serif; margin: 4px 0 10px; }
+    .pie-layout { display: grid; grid-template-columns: minmax(190px,240px) 1fr; gap: 22px; align-items: center; }
+    .legend-list { list-style: none; padding: 0; margin: 0; font-size: .9rem; }
+    .legend-list li { display: flex; gap: 8px; align-items: start; margin: 7px 0; overflow-wrap: anywhere; }
+    .dot { flex: 0 0 11px; height: 11px; border-radius: 50%; margin-top: 5px; }
+    .chart-empty { text-align: center; padding: 65px 0; color: #748078; }
+    .color-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-top: 14px; }
+    .color-item { display: flex; align-items: start; gap: 10px; padding: 10px 12px; background: #f6f8f5; border-radius: 9px; }
+    .color-item strong { display: block; font-size: .84rem; }
+    .color-item p { margin: 3px 0 0; color: #66736d; font-size: .74rem; }
+    .swatch { flex: 0 0 16px; height: 16px; margin-top: 2px; border-radius: 4px; background: var(--swatch,#aab3af); }
+    .section-space { margin-top: 19px; }
+    .controls { display: grid; grid-template-columns: minmax(160px,1.5fr) repeat(3,minmax(130px,1fr)); gap: 10px; margin: 12px 0 10px; }
+    .controls label,.field-label { display: block; color: #53615e; font-size: .76rem; font-weight: 700; }
+    .controls input,.controls select,.settings-grid input:not([type="checkbox"]),.settings-grid select,.settings-grid textarea { width: 100%; border: 1px solid #ccd8d2; border-radius: var(--control-radius); padding: 0 10px; background: white; color: #20312d; margin-top: 5px; }
+    .controls input,.controls select,.settings-grid input:not([type="checkbox"]),.settings-grid select { height: var(--control-height); }
+    .controls select,.chart-controls select,.settings-grid select { -webkit-appearance: none; appearance: none; display: block; height: var(--control-height); min-height: var(--control-height); line-height: normal; padding: 0 34px 0 10px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23536b61' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 12px 8px; }
+    .settings-grid input[type="color"] { padding: 4px; }
+    .settings-grid textarea { min-height: 90px; padding-block: 8px; resize: vertical; }
+    .timezone-setting .small { display: block; margin-top: 4px; font-weight: 400; }
+    .controls :focus-visible,.settings-grid :focus-visible,button:focus-visible { outline: 3px solid #9fddc4; outline-offset: 1px; }
+    .result-line { margin: 8px 0 14px; }
+    .status-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+    .status-summary button { min-height: var(--control-height); border: 1px solid var(--status-color,#b6c4bb); border-radius: var(--control-radius); background: var(--status-bg,#fff); color: #24443b; padding: 0 10px; font-size: .78rem; font-weight: 700; }
+    .status-summary button:hover { filter: brightness(.96); }
+    .collection-node { background: white; border: 1px solid #dfe7df; border-radius: 10px; margin: 8px 0; scroll-margin-top: 88px; }
+    .collection-node > summary { padding: 12px 15px; color: #244f43; font-weight: 700; cursor: pointer; }
     .collection-node > summary:hover { background: #f4f8f4; }
-    .collection-count { color: #71827b; font-size: .79rem; font-weight: 500; margin-left: 8px; }
-    .collection-body { padding: 0 13px 11px 18px; }
-    .paper-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; border-left: 5px solid var(--status-color, #a7b3ae); background: var(--status-bg, #f8f9f7); border-radius: 0 8px 8px 0; margin: 7px 0; padding: 9px 12px; }
-    .paper-row a { font-weight: 700; overflow-wrap: anywhere; }
-    .paper-detail { display: block; color: #66736d; font-size: .78rem; margin-top: 2px; }
-    .status-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; max-width: 270px; }
-    .status-tag { background: #fff; border: 1px solid #d7e0d9; border-radius: 100px; padding: 3px 9px; color: #3c5149; font-size: .73rem; white-space: nowrap; }
-    .collection-empty { color: #75817d; font-size: .83rem; padding: 9px 0; }
-    .color-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
-    .legend-item { display: flex; align-items: start; gap: 10px; padding: 11px 12px; background: #f6f9f5; border-radius: 9px; }
-    .legend-item strong { display: block; font-size: .86rem; line-height: 1.3; }
-    .legend-item p { margin: 4px 0 0; font-size: .76rem; color: #66736d; }
-    .legend-swatch { flex: 0 0 16px; height: 16px; margin-top: 2px; background: var(--swatch, #aab3af); border-radius: 4px; border: 1px solid #0001; }
-    .controls { display: grid; grid-template-columns: minmax(180px, 1.5fr) repeat(3, minmax(140px, 1fr)); gap: 10px; margin: 15px 0 11px; }
-    .controls label { display: block; font-size: .76rem; font-weight: 700; color: #53615e; }
-    .controls input, .controls select { width: 100%; border: 1px solid #ccd8d2; border-radius: 8px; padding: 9px 10px; background: white; color: #20312d; margin-top: 5px; }
-    .controls input:focus, .controls select:focus { outline: 3px solid #9fddc4; outline-offset: 1px; }
-    .result-line { font-size: .84rem; color: #65716d; margin-bottom: 16px; }
-    .entry { padding: 24px 27px; margin-bottom: 15px; }
-    .entry-head { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
-    .entry h3 { margin: 0 0 4px; font: 700 1.45rem/1.25 Georgia, serif; }
-    .small { color: #687474; font-size: .84rem; }
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
-    .chip { background: #edf4ef; color: #36584c; border-radius: 100px; padding: 3px 9px; font-size: .76rem; }
-    .chip.reason { background: #e9f0f9; color: #375072; }
-    .chip.status { background: #e3eee9; color: #245548; }
-    .annotation { border-left: 5px solid var(--c, #aab3af); background: #fafbf9; border-radius: 0 9px 9px 0; padding: 12px 15px; margin-top: 13px; }
-    .annotation-head { display: flex; justify-content: space-between; gap: 10px; color: #526360; font-size: .8rem; }
-    .annotation blockquote { white-space: pre-wrap; margin: 9px 0 4px; }
-    .annotation .comment { margin: 8px 0; color: #3a554c; font-style: italic; }
-    .annotation a { font-size: .82rem; }
-    .empty { padding: 42px; text-align: center; color: #66736d; }
-    @media (max-width: 850px) { .charts, .controls, .color-legend { grid-template-columns: 1fr 1fr; } .pie-layout { grid-template-columns: 170px 1fr; } }
-    @media (max-width: 560px) { .wrap { padding: 0 15px; } .stats, .charts, .controls, .pie-layout, .color-legend { grid-template-columns: 1fr; } .entry-head { display: block; } .entry { padding: 20px; } .paper-row { grid-template-columns: 1fr; } .status-tags { justify-content: flex-start; } }
-    @media print { header { background: white; color: #173d39; padding: 10px 0; } header p, .eyebrow { color: #3e6257; } .controls, .view-tabs { display: none; } .collection-tree { max-height: none; overflow: visible; } .entry, .paper-row { break-inside: avoid; } .panel, .entry, .stat { box-shadow: none; } }
+    .collection-count { color: #748078; font-size: .78rem; font-weight: 500; margin-left: 8px; }
+    .collection-body { padding: 0 12px 9px 17px; }
+    .collection-node.single-root { border: 0; background: transparent; }
+    .collection-node.single-root > summary { display: none; }
+    .collection-node.single-root > .collection-body { padding: 0; }
+    .paper-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; border-left: 5px solid var(--status-color,#a7b3ae); background: var(--status-bg,#f8f9f7); border-radius: 0 8px 8px 0; margin: 6px 0; padding: 8px 11px; }
+    .paper-title { display: inline-block; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+    .paper-meta { display: block; color: #66736d; font-size: .76rem; margin-top: 2px; }
+    .status-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+    .status-tag,.badge { display: inline-block; background: white; border: 1px solid #d7e0d9; border-radius: 100px; padding: 2px 8px; color: #3c5149; font-size: .72rem; white-space: nowrap; }
+    .badge { background: #eaf2ed; border: 0; }
+    .feed-group { margin: 19px 0 26px; }
+    .feed-group h2 { margin-bottom: 10px; }
+    .feed-collection { margin-bottom: 18px; }
+    .collection-jump { min-height: var(--control-height); border: 0; background: transparent; padding: 0; color: #17645d; font-size: .88rem; font-weight: 700; }
+    .collection-jump:hover { text-decoration: underline; }
+    .event-row { display: grid; grid-template-columns: 145px 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid #e6ece6; }
+    .event-row:first-child { border-top: 0; }
+    .event-main { min-width: 0; }
+    .event-main .paper-title { margin-right: 8px; }
+    .event-time { color: #687772; font-size: .78rem; }
+    .groupers { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin: 12px 0; }
+    .grouper { display: inline-flex; align-items: center; min-height: var(--control-height); border: 1px solid #b9d0c3; border-radius: var(--control-radius); background: #e6f1e9; color: #174d3d; }
+    .grouper.inactive { background: #f4f6f2; color: #6c7770; border-color: #d8e0da; }
+    .grouper button { min-height: calc(var(--control-height) - 2px); background: transparent; border: 0; color: inherit; padding: 0 8px; font-size: .79rem; }
+    .grouper .move { border-left: 1px solid #d2ded5; padding-inline: 6px; }
+    .grouper[draggable="true"] { cursor: grab; }
+    .journal-group { margin: 9px 0; border: 1px solid #dfe7df; border-radius: 10px; background: white; }
+    .journal-group > summary { cursor: pointer; padding: 10px 13px; font-weight: 700; color: #244f43; }
+    .journal-group-body { padding: 0 11px 10px 15px; }
+    .journal-entry { border-left: 5px solid var(--annotation-color,#aab3af); background: #fafbf9; padding: 13px 16px; border-radius: 0 9px 9px 0; margin: 8px 0; }
+    .journal-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .journal-entry blockquote { white-space: pre-wrap; margin: 9px 0; font-size: .91rem; }
+    .journal-entry .comment { white-space: pre-wrap; margin: 7px 0; color: #38544b; }
+    .empty { text-align: center; padding: 37px 20px; color: #65736e; }
+    dialog { border: 1px solid #d8e4db; border-radius: 14px; padding: 0; width: min(850px,94vw); max-height: 88vh; box-shadow: 0 20px 70px #0004; }
+    #range-dialog { width: min(430px,94vw); }
+    dialog::backdrop { background: #173d3977; }
+    .settings-head { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 16px 22px; background: #173d39; color: white; }
+    .settings-head h2 { margin: 0; }
+    .settings-content { padding: 18px 22px 24px; overflow-y: auto; max-height: calc(88vh - 69px); }
+    .settings-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+    .settings-grid label { font-size: .8rem; font-weight: 700; color: #4e5f58; }
+    .settings-section { border-top: 1px solid #dfe7df; padding-top: 15px; margin-top: 18px; }
+    .settings-section h3 { margin-bottom: 10px; }
+    .settings-list { display: grid; gap: 6px; max-height: 160px; overflow: auto; padding: 8px; background: #f7f9f6; border-radius: 8px; }
+    .settings-list label { display: flex; gap: 8px; font-weight: 500; }
+    .settings-list input { width: auto; margin: 4px 0 0; }
+    .collection-picker { max-height: 290px; overflow-y: auto; background: #f7f9f6; border-radius: 8px; padding: 8px 10px; }
+    .collection-choice-list,.collection-choice-children { list-style: none; margin: 0; padding: 0; }
+    .collection-choice-children { margin-left: 13px; padding-left: 10px; border-left: 1px solid #d6e3d8; }
+    .collection-choice-row { display: flex; align-items: start; gap: 7px; padding: 5px 0; }
+    .collection-choice-row input { flex: 0 0 auto; width: auto; margin: 2px 0 0; }
+    .collection-choice-note { color: #687772; font-size: .72rem; font-weight: 400; }
+    .unfiled-setting { display: flex; gap: 6px; align-items: center; margin-top: 12px; }
+    .settings-grid input[type="checkbox"] { width: auto; margin-right: 5px; }
+    .settings-actions { display: flex; gap: 9px; justify-content: flex-end; margin-top: 19px; }
+    .primary,.secondary { display: inline-flex; align-items: center; justify-content: center; min-height: var(--control-height); border-radius: var(--control-radius); padding: 0 14px; font-size: .88rem; font-weight: 700; }
+    .primary { border: 1px solid #1e7464; background: #1e7464; color: white; }
+    .secondary { border: 1px solid #b9cfc2; background: white; color: #244f43; }
+    .error { color: #a34242; font-size: .84rem; }
+    @media (max-width: 850px) { .header-inner { flex-wrap: wrap; padding-block: 9px; gap: 8px; } .site-nav { order: 3; flex-basis: 100%; } .color-grid { grid-template-columns: 1fr 1fr; } .controls { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 560px) { .wrap { padding-inline: 15px; } .stats,.charts,.color-grid,.controls,.pie-layout,.settings-grid { grid-template-columns: 1fr; } .event-row { grid-template-columns: 1fr; gap: 4px; } .paper-row { grid-template-columns: 1fr; } .status-tags { justify-content: flex-start; } .site-nav button { padding-inline: 7px; font-size: .75rem; } }
+    @media print { .site-header { position: static; box-shadow: none; } .site-nav,.header-actions,.controls,.groupers { display: none; } .view:not([hidden]) { display: block; } .collection-node,.journal-group { break-inside: avoid; } .panel,.stat { box-shadow: none; } }
   </style>
 </head>
 <body>
-  <header><div class="wrap">
-    <div class="eyebrow">Zotero · Research Journal</div>
-    <h1>Reading Journal</h1>
-    <p id="subtitle"></p>
-  </div></header>
-  <main class="wrap">
-    <section class="stats" aria-label="Overview">
-      <div class="stat"><strong id="stat-scope">0</strong><span>Papers in the current collection scope</span></div>
-      <div class="stat"><strong id="stat-entries">0</strong><span>Papers with journal entries in this period</span></div>
-      <div class="stat"><strong id="stat-annotations">0</strong><span>Annotations added or modified in this period</span></div>
-    </section>
-    <section class="charts" aria-label="Library overview">
-      <div class="panel"><h2>Current collection growth</h2><p class="help">Papers currently in scope, by month added.</p><div id="growth-chart"></div></div>
-      <div class="panel"><h2>Papers by collection</h2><p class="help" id="pie-help"></p><div class="pie-layout"><div id="pie-chart"></div><ul id="pie-legend" class="legend"></ul></div></div>
-    </section>
-    <section class="panel" style="margin-top:16px" aria-label="Annotation color legend"><h2>Annotation color key</h2><div id="color-legend" class="color-legend"></div></section>
-    <nav class="view-tabs" role="tablist" aria-label="Journal views">
-      <button id="tab-feed" class="view-tab" role="tab" aria-controls="view-feed" aria-selected="true" type="button">Activity feed</button>
-      <button id="tab-collections" class="view-tab" role="tab" aria-controls="view-collections" aria-selected="false" type="button">Collections</button>
+  <header class="site-header"><div class="wrap header-inner">
+    <div class="brand"><strong>Reading Journal</strong><button id="range-label" class="range-toggle" type="button" aria-label="Filter report by date range"></button></div>
+    <nav class="site-nav" aria-label="Pages">
+      <button type="button" data-view="dashboard" aria-current="page">Dashboard</button>
+      <button type="button" data-view="feed">Activity Feed</button>
+      <button type="button" data-view="journal">Journal Entries</button>
     </nav>
-    <section id="view-feed" class="view-panel" role="tabpanel" aria-labelledby="tab-feed">
-      <div class="view-heading"><h2>Activity feed</h2></div>
-      <div class="controls" aria-label="Filter activity feed">
-        <label>Search<input id="search" type="search" placeholder="Title, source passage, comment"></label>
-        <label>Annotation color<select id="color-filter"><option value="">All colors</option></select></label>
-        <label>Collection<select id="collection-filter"><option value="">All collections</option></select></label>
-        <label>Categorized tag<select id="tag-filter"><option value="">All tags</option></select></label>
+    __APP_CONTROLS__
+  </div></header>
+  <dialog id="range-dialog" aria-labelledby="range-heading">
+    <div class="settings-head"><h2 id="range-heading">Date range</h2><button id="range-close" class="secondary" type="button">Close</button></div>
+    <form id="range-form" class="settings-content">
+      <p id="range-available" class="help"></p>
+      <div class="settings-grid"><label>From<input id="range-from" type="date" required></label><label>To<input id="range-to" type="date" required></label></div>
+      <p id="range-error" class="error" role="alert"></p>
+      <div class="settings-actions"><button id="range-reset" class="secondary" type="button">Full range</button><button id="range-cancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Apply range</button></div>
+    </form>
+  </dialog>
+  <main class="wrap">
+    <section id="view-dashboard" class="view" aria-labelledby="dashboard-heading">
+      <div class="page-head"><h1 id="dashboard-heading">Dashboard</h1></div>
+      <div class="stats" aria-label="Overview">
+        <div class="stat"><strong id="stat-scope">0</strong><span>Papers active in selected range</span></div>
+        <div class="stat"><strong id="stat-active">0</strong><span>Papers added in selected range</span></div>
+        <div class="stat"><strong id="stat-journal">0</strong><span>Annotations in selected range</span></div>
       </div>
-      <div id="result-line" class="result-line" aria-live="polite"></div>
-      <div id="entries"></div>
+      <div class="charts">
+        <section class="panel"><div class="chart-head"><div><h2>Collection Size</h2><p class="help">Papers in the current collection scope, by date added.</p></div><div class="chart-controls"><label>Resolution<select id="growth-resolution"><option value="month">Month</option><option value="day">Day</option></select></label><label>Selected date<input id="growth-date" type="date"></label></div></div><div id="growth-selected-total" class="chart-total" aria-live="polite"></div><div id="growth-chart"></div></section>
+        <section class="panel"><h2>Papers by Subcollection</h2><p class="help" id="pie-help"></p><div class="pie-layout"><div id="pie-chart"></div><ul id="pie-legend" class="legend-list"></ul></div></section>
+      </div>
+      <section class="panel section-space"><h2>Annotation color key</h2><div id="color-legend" class="color-grid"></div></section>
+      <section class="section-space" aria-labelledby="collections-heading">
+        <h2 id="collections-heading">Collections</h2>
+        <div id="status-summary" class="status-summary" aria-label="Current paper status counts"></div>
+        <div class="controls">
+          <label>Search papers<input id="inventory-search" type="search" placeholder="Title or author"></label>
+          <label>Show<select id="inventory-filter"><option value="all">All papers</option><option value="new">New in this period</option><option value="active">Annotation activity in this period</option><option value="to_read">To read</option><option value="reading">Reading</option><option value="read">Read</option><option value="revisit">Revisit</option><option value="unassigned">Unassigned</option><option value="conflicting">Conflicting statuses</option></select></label>
+          <label>Sort<select id="inventory-sort"><option value="title">Title A–Z</option><option value="newest">Newest added</option><option value="oldest">Oldest added</option><option value="annotation">Recent annotation activity</option><option value="status">Reading status</option></select></label>
+          <label>Categorized tag<select id="inventory-tag"><option value="">All tags</option></select></label>
+        </div>
+        <div id="inventory-result" class="result-line" aria-live="polite"></div>
+        <div id="collection-tree"></div>
+      </section>
     </section>
-    <section id="view-collections" class="view-panel" role="tabpanel" aria-labelledby="tab-collections" hidden>
-      <div class="view-heading"><h2>Collection overview</h2></div>
-      <div class="controls" aria-label="Filter collection overview">
-        <label>Search papers<input id="inventory-search" type="search" placeholder="Title or author"></label>
-        <label>Show<select id="inventory-filter"><option value="all">All papers</option><option value="new">New in this period</option><option value="active">Annotation activity in this period</option><option value="to-read">To read</option><option value="reading">Reading</option><option value="read">Read</option><option value="revisit">Revisit</option><option value="unassigned">Unassigned</option></select></label>
-        <label>Sort<select id="inventory-sort"><option value="title">Title A–Z</option><option value="newest">Newest added</option><option value="oldest">Oldest added</option><option value="annotation">Recent annotation activity</option><option value="status">Reading status</option></select></label>
-        <label>Categorized tag<select id="inventory-tag"><option value="">All tags</option></select></label>
+    <section id="view-feed" class="view" aria-labelledby="feed-heading" hidden>
+      <div class="page-head"><h1 id="feed-heading">Activity Feed</h1></div>
+      <div class="controls">
+        <label>Search<input id="feed-search" type="search" placeholder="Paper or author"></label>
+        <label>Event<select id="feed-type"><option value="">All events</option><option>Paper added</option><option>Annotation added</option><option>Annotation modified</option></select></label>
+        <label>Collection<select id="feed-collection"><option value="">All collections</option></select></label>
+        <label>Categorized tag<select id="feed-tag"><option value="">All tags</option></select></label>
       </div>
-      <div id="inventory-result" class="result-line" aria-live="polite"></div>
-      <div id="collection-tree" class="collection-tree"></div>
+      <div id="feed-result" class="result-line" aria-live="polite"></div><div id="feed-list"></div>
+    </section>
+    <section id="view-journal" class="view" aria-labelledby="journal-heading" hidden>
+      <div class="page-head"><h1 id="journal-heading">Journal Entries</h1><span class="small">Annotations only</span></div>
+      <div class="controls">
+        <label>Search<input id="journal-search" type="search" placeholder="Paper, passage, comment"></label>
+        <label>Annotation category<select id="journal-category"><option value="">All categories</option></select></label>
+        <label>Collection<select id="journal-collection"><option value="">All collections</option></select></label>
+        <label>Categorized tag<select id="journal-tag"><option value="">All tags</option></select></label>
+      </div>
+      <div class="small">Group by · click to toggle, drag or use arrows to reorder · weeks run Monday–Sunday</div>
+      <div id="groupers" class="groupers" aria-label="Journal grouping order"></div>
+      <div id="journal-result" class="result-line" aria-live="polite"></div><div id="journal-list"></div>
     </section>
   </main>
   <script>
     const data = __JOURNAL_DATA__;
-    const $ = id => document.getElementById(id);
-    const palette = ['#1e7464','#e1a64b','#5878b9','#af718f','#86a85d','#b88258','#708d9a','#b8aa64','#7d79b1','#c2706f'];
-    const h = (tag, className, text) => { const n = document.createElement(tag); if (className) n.className = className; if (text !== undefined) n.textContent = text; return n; };
-    const localTime = iso => iso ? new Intl.DateTimeFormat('en-GB', {dateStyle:'medium', timeStyle:'short', timeZone:data.timezone}).format(new Date(iso)) : 'unknown';
-    $('subtitle').textContent = `${data.range.from} – ${data.range.to}`;
-    $('stat-scope').textContent = data.scope.papers;
-    $('stat-entries').textContent = data.entries.length;
-    $('stat-annotations').textContent = data.entries.reduce((n,e)=>n+e.annotations.length,0);
-
-    function drawGrowth() {
-      const host = $('growth-chart');
-      if (!data.growth.length) { host.append(h('div','chart-empty','No addition dates available.')); return; }
-      const W=560,H=235,L=44,R=14,T=18,B=36, max=Math.max(1,...data.growth.map(x=>x.count));
-      const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-      svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('role','img');
-      svg.setAttribute('aria-label',`Current collection growth from ${data.growth[0].month} to ${data.growth.at(-1).month}, ending with ${data.growth.at(-1).count} papers`);
-      const ns='http://www.w3.org/2000/svg';
-      const add=(kind,attrs,text)=>{const e=document.createElementNS(ns,kind); for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v); if(text!==undefined)e.textContent=text; svg.append(e); return e;};
-      for(let i=0;i<=4;i++){const y=T+(H-T-B)*i/4; add('line',{x1:L,x2:W-R,y1:y,y2:y,stroke:'#dbe4de','stroke-width':1}); add('text',{x:L-9,y:y+4,'text-anchor':'end',fill:'#718078','font-size':11},Math.round(max*(1-i/4)));}
-      const points=data.growth.map((d,i)=>[L+(W-L-R)*(data.growth.length===1?.5:i/(data.growth.length-1)),T+(H-T-B)*(1-d.count/max)]);
-      add('polygon',{points:`${L},${H-B} ${points.map(p=>p.join(',')).join(' ')} ${W-R},${H-B}`,fill:'#d9eee4'});
-      add('polyline',{points:points.map(p=>p.join(',')).join(' '),fill:'none',stroke:'#1e7464','stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'});
-      for(const [x,y] of points) add('circle',{cx:x,cy:y,r:2.6,fill:'#1e7464'});
-      add('text',{x:L,y:H-8,fill:'#718078','font-size':11},data.growth[0].month);
-      add('text',{x:W-R,y:H-8,'text-anchor':'end',fill:'#718078','font-size':11},data.growth.at(-1).month);
-      host.append(svg);
-    }
-    function drawPie() {
-      const host=$('pie-chart'), legend=$('pie-legend'), total=data.pie.reduce((n,x)=>n+x.count,0);
-      $('pie-help').textContent = `Each paper counts once; ${data.scope.multi_membership} with multiple memberships.`;
-      if (!total) { host.append(h('div','chart-empty','No papers in scope.')); return; }
-      const ns='http://www.w3.org/2000/svg', svg=document.createElementNS(ns,'svg'); svg.setAttribute('viewBox','0 0 190 190'); svg.setAttribute('role','img'); svg.setAttribute('aria-label',`Distribution of ${total} papers across collections`);
-      const circle=(attrs)=>{let e=document.createElementNS(ns,'circle'); for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);svg.append(e);};
-      circle({cx:95,cy:95,r:67,fill:'none',stroke:'#e7ede8','stroke-width':31});
-      let offset=0, circumference=2*Math.PI*67;
-      data.pie.forEach((slice,i)=>{
-        const fraction=slice.count/total, color=palette[i%palette.length];
-        circle({cx:95,cy:95,r:67,fill:'none',stroke:color,'stroke-width':31,'stroke-dasharray':`${fraction*circumference} ${circumference}`,'stroke-dashoffset':-offset*circumference,transform:'rotate(-90 95 95)'});
-        offset+=fraction;
-        const li=h('li'); const dot=h('span','dot'); dot.style.background=color; li.append(dot,h('span','',`${slice.name} · ${slice.count}`)); legend.append(li);
-      });
-      const label=document.createElementNS(ns,'text');label.setAttribute('x',95);label.setAttribute('y',101);label.setAttribute('text-anchor','middle');label.setAttribute('font-size',29);label.setAttribute('font-family','Georgia,serif');label.setAttribute('fill','#173d39');label.textContent=total;svg.append(label);host.append(svg);
-    }
-    drawGrowth(); drawPie();
-
-    data.color_legend.forEach(item=>{
-      const row=h('div','legend-item'), swatch=h('span','legend-swatch'), content=h('div');
-      if(/^#[0-9a-f]{6}$/i.test(item.color))swatch.style.setProperty('--swatch',item.color);
-      content.append(h('strong','',item.label),h('p','',item.description));row.append(swatch,content);$('color-legend').append(row);
-    });
-
-    const colors=new Map(), paths=new Set(), tags=new Set();
-    data.entries.forEach(e=>{e.collections.forEach(c=>paths.add(c));e.annotations.forEach(a=>colors.set(a.color,`${a.meaning} (${a.color||'no color'})`));});
-    data.inventory.forEach(p=>Object.values(p.tags).flat().forEach(t=>tags.add(t)));
-    const option=(value,label)=>{const o=document.createElement('option');o.value=value;o.textContent=label;return o;};
-    [...colors.entries()].sort((a,b)=>a[1].localeCompare(b[1])).forEach(([v,l])=>$('color-filter').append(option(v,l)));
-    [...paths].sort().forEach(v=>$('collection-filter').append(option(v,v)));
-    [...tags].sort().forEach(v=>{$('tag-filter').append(option(v,v));$('inventory-tag').append(option(v,v));});
-
-    function activateTab(name) {
-      for(const view of ['feed','collections']) {
-        const active=view===name;
-        $('tab-'+view).setAttribute('aria-selected',String(active));
-        $('view-'+view).hidden=!active;
-      }
-      if(name==='collections')renderCollections();
-    }
-    $('tab-feed').addEventListener('click',()=>activateTab('feed'));
-    $('tab-collections').addEventListener('click',()=>activateTab('collections'));
-
-    function openCollection(key) {
-      $('inventory-search').value='';$('inventory-filter').value='all';$('inventory-tag').value='';
-      activateTab('collections');
-      const nodes=[...$('collection-tree').querySelectorAll('details.collection-node')];
-      const target=nodes.find(node=>node.dataset.key===key);
-      if(target){let node=target;while(node){if(node.tagName==='DETAILS')node.open=true;node=node.parentElement?.closest('details.collection-node');}target.scrollIntoView({behavior:'smooth',block:'start'});}
-    }
-
-    function entryCard(e, showAnnotations, color) {
-      const card=h('article','entry'), head=h('div','entry-head'), text=h('div');
-      text.append(h('h3','',e.title),h('div','small',`${e.creators.slice(0,3).join(', ')}${e.creators.length>3?' et al.':''} · ${e.item_type} · added ${localTime(e.date_added)}`));
-      const link=h('a','','Open in Zotero');link.href=e.link;head.append(text,link);card.append(head);
-      const reasons=h('div','chips');e.reasons.forEach(r=>reasons.append(h('span','chip reason',r)));card.append(reasons);
-      const statusrow=h('div','chips');statusrow.append(h('span','chip status',`Current status: ${e.status.label}`));if(e.status.revisit)statusrow.append(h('span','chip status','Revisit'));card.append(statusrow);
-      const tagrow=h('div','chips');Object.entries(e.tags).filter(([group])=>group!=='Status').forEach(([group,values])=>values.forEach(v=>tagrow.append(h('span','chip',`${group}: ${v}`))));if(tagrow.childNodes.length)card.append(tagrow);
-      if(showAnnotations){
-        const anns=color?e.annotations.filter(a=>a.color===color):e.annotations;
-        anns.forEach(a=>{
-          const box=h('section','annotation');if(/^#[0-9a-f]{6}$/i.test(a.color))box.style.setProperty('--c',a.color);
-          const bar=h('div','annotation-head');bar.append(h('strong','',`${a.meaning} · p. ${a.page}`),h('span','',`Added ${localTime(a.date_added)} · modified ${localTime(a.date_modified)}`));box.append(bar);
-          if(a.text){box.append(h('div','small','Highlighted source text'),h('blockquote','',a.text));}
-          if(a.comment)box.append(h('p','comment',`Annotation comment: ${a.comment}`));
-          if(a.tags.length)box.append(h('div','small',`Annotation tags: ${a.tags.join(', ')}`));
-          const open=h('a','','Open annotation in Zotero');open.href=a.link;box.append(open);card.append(box);
-        });
-      }
-      return card;
-    }
-
-    function renderFeed() {
-      const query=$('search').value.toLocaleLowerCase(), color=$('color-filter').value, collection=$('collection-filter').value, tag=$('tag-filter').value;
-      const matches=data.entries.filter(e=>{
-        if(collection&&!e.collections.includes(collection))return false;
-        if(tag&&!Object.values(e.tags).flat().includes(tag))return false;
-        const annotations=color?e.annotations.filter(a=>a.color===color):e.annotations;
-        if(color&&!annotations.length)return false;
-        const haystack=[e.title,...e.creators,...e.collections,...Object.values(e.tags).flat(),...annotations.flatMap(a=>[a.text,a.comment])].join(' ').toLocaleLowerCase();
-        return !query||haystack.includes(query);
-      });
-      const host=$('entries');host.replaceChildren();
-      $('result-line').textContent=`${matches.length} of ${data.entries.length} active papers visible`;
-      if(!matches.length){host.append(h('div','panel empty','No activity matches these filters.'));return;}
-      const groups=[['New papers',e=>e.reasons.includes('Paper added'),false],['Annotation activity',e=>e.annotations.length>0,true]];
-      for(const [label,predicate,showAnnotations] of groups){
-        const members=matches.filter(predicate);if(!members.length)continue;
-        const section=h('section','feed-group');section.append(h('h3','',`${label} · ${members.length}`));
-        const byCollection=new Map();
-        members.forEach(e=>{
-          const memberships=e.collection_keys.length?e.collection_keys:[null];
-          memberships.forEach((key,i)=>{
-            const path=e.collections[i]||'Unfiled';
-            if(!byCollection.has(path))byCollection.set(path,{key,items:[]});
-            byCollection.get(path).items.push(e);
-          });
-        });
-        [...byCollection.entries()].sort((a,b)=>a[0].localeCompare(b[0])).forEach(([path,group])=>{
-          const block=h('div','feed-collection');
-          if(group.key){const jump=h('button','collection-jump',`${path} · ${group.items.length}`);jump.type='button';jump.addEventListener('click',()=>openCollection(group.key));block.append(jump);}
-          else block.append(h('div','small',`Unfiled · ${group.items.length}`));
-          group.items.forEach(e=>block.append(entryCard(e,showAnnotations,color)));
-          section.append(block);
-        });
-        host.append(section);
-      }
-    }
-
-    const statusPaint={
-      'To read':['#87958d','#f3f5f2'],Reading:['#4c87bd','#edf5fb'],Read:['#4c9a68','#edf8f0'],
-      'Conflicting statuses':['#bc6464','#fcf1f0'],Unassigned:['#aab5af','#f7f8f6']
-    };
-    function paperRow(p){
-      const row=h('div','paper-row'), paint=p.status.label==='Conflicting statuses'?statusPaint['Conflicting statuses']:(p.status.revisit?['#dd9950','#fff5eb']:(statusPaint[p.status.label]||statusPaint.Unassigned));
-      row.style.setProperty('--status-color',paint[0]);row.style.setProperty('--status-bg',paint[1]);
-      const main=h('div'), link=h('a','',p.title);link.href=p.link;
-      main.append(link,h('span','paper-detail',`${p.creators.slice(0,2).join(', ')||'Unknown author'} · added ${localTime(p.date_added)} · ${p.annotation_count} annotation${p.annotation_count===1?'':'s'}`));
-      const right=h('div','status-tags');const values=p.status_tags.length?p.status_tags:['No status'];
-      values.forEach(value=>right.append(h('span','status-tag',value)));
-      row.append(main,right);return row;
-    }
-    function renderCollections(){
-      const query=$('inventory-search').value.toLocaleLowerCase(), filter=$('inventory-filter').value, sort=$('inventory-sort').value, tag=$('inventory-tag').value;
-      const visible=data.inventory.filter(p=>{
-        if(query&&![p.title,...p.creators].join(' ').toLocaleLowerCase().includes(query))return false;
-        if(tag&&!Object.values(p.tags).flat().includes(tag))return false;
-        if(filter==='new')return p.new_in_period;
-        if(filter==='active')return p.annotated_in_period;
-        if(filter==='revisit')return p.status.revisit;
-        if(filter==='unassigned')return p.status.label==='Unassigned';
-        if(['to-read','reading','read'].includes(filter))return p.status.label===({'to-read':'To read',reading:'Reading',read:'Read'}[filter]);
-        return true;
-      });
-      const compare={
-        title:(a,b)=>a.title.localeCompare(b.title),newest:(a,b)=>b.date_added.localeCompare(a.date_added)||a.title.localeCompare(b.title),
-        oldest:(a,b)=>a.date_added.localeCompare(b.date_added)||a.title.localeCompare(b.title),
-        annotation:(a,b)=>b.annotation_activity_at.localeCompare(a.annotation_activity_at)||a.title.localeCompare(b.title),
-        status:(a,b)=>a.status.label.localeCompare(b.status.label)||a.title.localeCompare(b.title)
-      };
-      visible.sort(compare[sort]||compare.title);
-      $('inventory-result').textContent=`${visible.length} of ${data.inventory.length} papers visible`;const host=$('collection-tree');
-      const openKeys=new Set([...host.querySelectorAll('details.collection-node[open]')].map(node=>node.dataset.key));host.replaceChildren();
-      const children=new Map();
-      data.collections.forEach(c=>{const parent=c.parent_key||'';if(!children.has(parent))children.set(parent,[]);children.get(parent).push(c);});
-      const descendants=key=>[key,...(children.get(key)||[]).flatMap(c=>descendants(c.key))];
-      function node(c,depth=0){
-        const details=h('details','collection-node');details.dataset.key=c.key;details.open=openKeys.has(c.key)||depth===0;
-        const keys=new Set(descendants(c.key)), total=visible.filter(p=>p.collection_keys.some(key=>keys.has(key))).length;
-        const direct=visible.filter(p=>p.collection_keys.includes(c.key));
-        const summary=h('summary','');summary.append(h('span','',c.name),h('span','collection-count',`${total} in branch · ${direct.length} here`));details.append(summary);
-        const body=h('div','collection-body');direct.forEach(p=>body.append(paperRow(p)));
-        if(!direct.length)body.append(h('div','collection-empty','No papers directly in this collection.'));
-        (children.get(c.key)||[]).forEach(child=>body.append(node(child,depth+1)));
-        details.append(body);return details;
-      }
-      (children.get('')||[]).forEach(c=>host.append(node(c)));
-      const unfiled=visible.filter(p=>!p.collection_keys.length);
-      if(unfiled.length){const details=h('details','collection-node');details.open=true;details.append(h('summary','','Unfiled · '+unfiled.length));const body=h('div','collection-body');unfiled.forEach(p=>body.append(paperRow(p)));details.append(body);host.append(details);}
-      if(!host.childNodes.length)host.append(h('div','panel empty','No collections in scope.'));
-    }
-    ['search','color-filter','collection-filter','tag-filter'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',renderFeed));
-    ['inventory-search','inventory-filter','inventory-sort','inventory-tag'].forEach(id=>$(id).addEventListener(id==='inventory-search'?'input':'change',renderCollections));
-    renderFeed();renderCollections();
+    const appConfig = __APP_CONFIG__;
+    const appCatalog = __APP_CATALOG__;
+    const appToken = __APP_TOKEN__;
+    __JOURNAL_JS__
+    __APP_JS__
   </script>
 </body>
 </html>

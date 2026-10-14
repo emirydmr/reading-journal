@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import re
 import sys
@@ -18,13 +19,87 @@ from zoneinfo import ZoneInfo
 HERE = Path(__file__).resolve().parent
 API = "http://127.0.0.1:23119/api/users/0"
 PAGE_SIZE = 100
-PRIMARY_STATUSES = {
-    "status/to-read": "To read",
-    "status/reading": "Reading",
-    "status/read": "Read",
+DEFAULT_STATUS_ROLES = {
+    "to_read": {"tag": "status/to-read", "label": "To read", "color": "#87958d", "background": "#f3f5f2"},
+    "reading": {"tag": "status/reading", "label": "Reading", "color": "#4c87bd", "background": "#edf5fb"},
+    "read": {"tag": "status/read", "label": "Read", "color": "#4c9a68", "background": "#edf8f0"},
+    "revisit": {"tag": "status/revisit", "label": "Revisit", "color": "#dd9950", "background": "#fff5eb"},
 }
-SUPPLEMENTARY_STATUS = "status/revisit"
-CANONICAL_STATUS_TAGS = set(PRIMARY_STATUSES) | {SUPPLEMENTARY_STATUS}
+PRIMARY_STATUSES = {DEFAULT_STATUS_ROLES[role]["tag"]: DEFAULT_STATUS_ROLES[role]["label"] for role in ("to_read", "reading", "read")}
+SUPPLEMENTARY_STATUS = DEFAULT_STATUS_ROLES["revisit"]["tag"]
+GROUPERS = ("status", "paper", "category", "collection", "day", "week", "month")
+
+
+def user_config_path() -> Path:
+    return Path.home() / "Library" / "Application Support" / "Reading Journal" / "config.json"
+
+
+def config_path() -> Path:
+    return user_config_path() if user_config_path().exists() else HERE / "config.json"
+
+
+def load_config(path: Path | None = None) -> dict:
+    return validate_config(json.loads((path or config_path()).read_text(encoding="utf-8")))
+
+
+def validate_config(raw: dict) -> dict:
+    if not isinstance(raw, dict):
+        raise ValueError("Configuration must be a JSON object")
+    config = copy.deepcopy(raw)
+    if not isinstance(config.get("tag_categories", {}), dict):
+        raise ValueError("Tag categories must be an object")
+    # Older files carried status as a generic tag category; status_roles owns it now.
+    config.setdefault("tag_categories", {}).pop("Status", None)
+    roles = config.setdefault("status_roles", copy.deepcopy(DEFAULT_STATUS_ROLES))
+    if not isinstance(roles, dict) or set(roles) != set(DEFAULT_STATUS_ROLES):
+        raise ValueError("Status roles must be to_read, reading, read, and revisit")
+    tags = []
+    for role in DEFAULT_STATUS_ROLES:
+        value = roles[role]
+        if not isinstance(value, dict):
+            raise ValueError(f"Status role {role} must be an object")
+        for field in ("tag", "label"):
+            if not isinstance(value.get(field), str) or not value[field].strip():
+                raise ValueError(f"Status role {role} needs a nonempty {field}")
+            value[field] = value[field].strip()
+        for field in ("color", "background"):
+            if not re.fullmatch(r"#[0-9a-fA-F]{6}", str(value.get(field, ""))):
+                raise ValueError(f"Status role {role} needs a hex {field}")
+        tags.append(value["tag"])
+    if len(set(tags)) != len(tags):
+        raise ValueError("Status role tags must be distinct")
+    if len({roles[role]["label"].casefold() for role in roles}) != len(roles):
+        raise ValueError("Status role labels must be distinct")
+    if any(roles[role]["label"].casefold() in {"unassigned", "conflicting statuses"} for role in roles):
+        raise ValueError("Status role labels cannot be Unassigned or Conflicting statuses")
+    groupers = config.setdefault("default_groupers", ["status", "paper", "category"])
+    if not isinstance(groupers, list) or any(not isinstance(group, str) for group in groupers) or len(groupers) != len(set(groupers)) or any(group not in GROUPERS for group in groupers):
+        raise ValueError("Default groupers must be unique known dimensions")
+    for field in ("included_collections", "paper_types"):
+        if not isinstance(config.get(field, []), list) or any(not isinstance(item, str) for item in config.get(field, [])):
+            raise ValueError(f"{field} must be a list of names")
+    for label, rule in config.get("tag_categories", {}).items():
+        if not isinstance(label, str) or not label.strip():
+            raise ValueError("Tag category names must be nonempty")
+        if not isinstance(rule, dict) or not isinstance(rule.get("prefix"), str) or not rule["prefix"]:
+            raise ValueError(f"Tag category {label!r} needs a prefix")
+        if not isinstance(rule.get("allowed_tags", []), list) or any(not isinstance(tag, str) for tag in rule.get("allowed_tags", [])):
+            raise ValueError(f"Tag category {label!r} needs a list of allowed tags")
+    annotation_color_legend(config)
+    ZoneInfo(config.get("timezone", "Asia/Shanghai"))
+    if int(config.get("default_window_days", 30)) < 1:
+        raise ValueError("Default window must be at least one day")
+    return config
+
+
+def external_paper_link(paper: dict) -> str:
+    doi = (paper.get("DOI") or "").strip()
+    doi = re.sub(r"^(?:doi:|https?://(?:dx\.)?doi\.org/)", "", doi, flags=re.I).strip()
+    if re.fullmatch(r"10\.\d{4,9}/\S+", doi, flags=re.I):
+        return "https://doi.org/" + urllib.parse.quote(doi, safe="/.-_()")
+    url = (paper.get("url") or "").strip()
+    parsed = urllib.parse.urlparse(url)
+    return url if parsed.scheme in ("http", "https") and parsed.netloc else ""
 
 
 def get_all(route: str) -> list[dict]:
@@ -52,6 +127,25 @@ def local_date(value: str | None, tz: ZoneInfo) -> date | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(tz).date()
     except ValueError:
         return None
+
+
+def local_periods(value: str | None, tz: ZoneInfo) -> dict[str, str]:
+    """Calendar groups for an annotation event in the report's timezone.
+
+    Weeks use ISO 8601: Monday to Sunday, with the ISO week-year at year edges.
+    """
+    if not value:
+        return {"day": "", "week": "", "month": ""}
+    try:
+        observed = datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(tz)
+    except ValueError:
+        return {"day": "", "week": "", "month": ""}
+    week_year, week_number, _ = observed.isocalendar()
+    return {
+        "day": observed.date().isoformat(),
+        "week": f"{week_year:04d}-W{week_number:02d}",
+        "month": f"{observed.year:04d}-{observed.month:02d}",
+    }
 
 
 def month_label(value: date) -> str:
@@ -131,17 +225,27 @@ def categorized_tags(tags: list[dict], categories: dict) -> dict[str, list[str]]
     return result
 
 
-def reading_status(tags: list[dict], item_key: str) -> tuple[dict, list[str]]:
+def reading_status(tags: list[dict], item_key: str, config: dict | None = None) -> tuple[dict, list[str]]:
+    roles = (config or {}).get("status_roles", DEFAULT_STATUS_ROLES)
     names = {tag.get("tag", "") for tag in tags}
-    present = [tag for tag in PRIMARY_STATUSES if tag in names]
+    present = [role for role in ("to_read", "reading", "read") if roles[role]["tag"] in names]
+    recognized = {value["tag"] for value in roles.values()}
     diagnostics = []
-    for tag in sorted(name for name in names if name.startswith("status/") and name not in CANONICAL_STATUS_TAGS):
-        hint = " (use status/to-read)" if tag == "status/to_read" else ""
+    for tag in sorted(name for name in names if name.startswith("status/") and name not in recognized):
+        hint = " (use status/to-read)" if tag == "status/to_read" and roles["to_read"]["tag"] == "status/to-read" else ""
         diagnostics.append(f"{item_key}: noncanonical status tag {tag}{hint}")
     if len(present) > 1:
-        diagnostics.append(f"{item_key}: conflicting primary statuses: {', '.join(present)}")
-    label = PRIMARY_STATUSES[present[0]] if len(present) == 1 else "Conflicting statuses" if present else "Unassigned"
-    return {"label": label, "revisit": SUPPLEMENTARY_STATUS in names}, diagnostics
+        diagnostics.append(f"{item_key}: conflicting primary statuses: {', '.join(roles[role]['tag'] for role in present)}")
+    label = roles[present[0]]["label"] if len(present) == 1 else "Conflicting statuses" if present else "Unassigned"
+    return {"label": label, "revisit": roles["revisit"]["tag"] in names}, diagnostics
+
+
+def status_group(status: dict, config: dict) -> str:
+    if status["label"] == "Conflicting statuses":
+        return "Conflicting statuses"
+    if status["revisit"]:
+        return config["status_roles"]["revisit"]["label"]
+    return status["label"]
 
 
 def annotation_color_legend(config: dict) -> tuple[dict[str, dict], list[dict]]:
@@ -166,10 +270,11 @@ def is_in_window(value: str | None, tz: ZoneInfo, first: date, last: date) -> bo
     return observed is not None and first <= observed <= last
 
 
-def build_report(config: dict, first: date, last: date) -> tuple[dict, list[str]]:
+def build_report(config: dict, first: date, last: date, *, items: list[dict] | None = None, collections: list[dict] | None = None) -> tuple[dict, list[str]]:
+    config = validate_config(config)
     tz = ZoneInfo(config.get("timezone", "Asia/Shanghai"))
-    items = get_all("/items")
-    collections = get_all("/collections")
+    items = get_all("/items") if items is None else items
+    collections = get_all("/collections") if collections is None else collections
     paths = collection_paths(collections)
     active_collection_keys = set(paths)
     selected = selected_collection_keys(config, collections)
@@ -200,6 +305,9 @@ def build_report(config: dict, first: date, last: date) -> tuple[dict, list[str]
             continue
         scoped.append(paper)
 
+    # Aggregate the current scope without embedding inactive papers' titles in an export.
+    # Collection membership is a current snapshot, not reconstructed history.
+    size_counts = Counter()
     # A pie needs mutually exclusive slices. Multiple membership is explicit, never guessed.
     pie = Counter()
     multi_membership = 0
@@ -209,10 +317,15 @@ def build_report(config: dict, first: date, last: date) -> tuple[dict, list[str]
             multi_membership += 1
         if len(memberships) > 1:
             pie["Multiple collections"] += 1
+            bucket = "Multiple collections"
         elif memberships:
             pie[paths[memberships[0]]] += 1
+            bucket = paths[memberships[0]]
         else:
             pie["Unfiled"] += 1
+            bucket = "Unfiled"
+        added_day = local_date(paper.get("dateAdded"), tz)
+        size_counts[(added_day.isoformat() if added_day else "", bucket)] += 1
 
     added_months = Counter()
     for paper in scoped:
@@ -227,16 +340,12 @@ def build_report(config: dict, first: date, last: date) -> tuple[dict, list[str]
         growth.append({"month": month, "count": cumulative, "added": added_months[month]})
 
     colors, color_legend = annotation_color_legend(config)
-    entries = []
+    activity = []
+    journal_entries = []
     inventory = []
     diagnostics = []
     for paper in scoped:
-        reasons = []
-        activity_times = []
         newly_added = is_in_window(paper.get("dateAdded"), tz, first, last)
-        if newly_added:
-            reasons.append("Paper added")
-            activity_times.append(paper["dateAdded"])
         recent_annotations = []
         all_annotations = annotations_by_paper.get(paper["key"], [])
         annotation_activity_at = max(
@@ -249,26 +358,12 @@ def build_report(config: dict, first: date, last: date) -> tuple[dict, list[str]
             modified = is_in_window(annotation.get("dateModified"), tz, first, last)
             if not (added or modified):
                 continue
-            if added:
-                reasons.append("Annotation added")
-            elif modified:
-                reasons.append("Annotation modified")
-            activity_times.append((annotation.get("dateModified") if modified else annotation.get("dateAdded")) or "")
             raw_color = (annotation.get("annotationColor") or "").lower()
             if raw_color not in colors and not any(item["color"] == raw_color for item in color_legend):
                 color_legend.append({"color": raw_color, "label": "Unmapped", "description": "No meaning is configured for this annotation color."})
-            position = annotation.get("annotationPosition") or ""
-            try:
-                page_index = json.loads(position).get("pageIndex")
-            except (ValueError, TypeError, AttributeError):
-                page_index = None
-            attachment_key = annotation.get("parentItem")
-            link = f"zotero://select/library/items/{paper['key']}"
-            if attachment_key:
-                params = {"annotation": annotation["key"]}
-                if isinstance(page_index, int) and page_index >= 0:
-                    params["page"] = page_index + 1
-                link = f"zotero://open-pdf/library/items/{attachment_key}?{urllib.parse.urlencode(params)}"
+            event_at = (annotation.get("dateModified") if modified else annotation.get("dateAdded")) or ""
+            added_periods = local_periods(annotation.get("dateAdded"), tz)
+            modified_periods = local_periods(annotation.get("dateModified"), tz)
             recent_annotations.append({
                 "key": annotation["key"],
                 "text": annotation.get("annotationText") or "",
@@ -278,12 +373,20 @@ def build_report(config: dict, first: date, last: date) -> tuple[dict, list[str]
                 "page": annotation.get("annotationPageLabel") or "?",
                 "date_added": annotation.get("dateAdded") or "",
                 "date_modified": annotation.get("dateModified") or "",
-                "link": link,
+                "event_type": "Annotation modified" if modified and (not added or annotation.get("dateModified", "") > annotation.get("dateAdded", "")) else "Annotation added",
+                "event_at": event_at,
+                "periods": local_periods(event_at, tz),
+                "added_periods": added_periods,
+                "modified_periods": modified_periods,
                 "tags": [tag for group in categorized_tags(annotation.get("tags") or [], config.get("tag_categories", {})).values() for tag in group],
             })
         tags = categorized_tags(paper.get("tags") or [], config.get("tag_categories", {}))
-        status, status_diagnostics = reading_status(paper.get("tags") or [], paper["key"])
+        status, status_diagnostics = reading_status(paper.get("tags") or [], paper["key"], config)
         diagnostics.extend(status_diagnostics)
+        mapped_status_tags = sorted(role["tag"] for role in config["status_roles"].values() if role["tag"] in {t.get("tag") for t in paper.get("tags") or []})
+        tags.pop("Status", None)
+        if mapped_status_tags:
+            tags["Status"] = mapped_status_tags
         membership_keys = sorted(
             (key for key in paper.get("collections") or []
              if key in active_collection_keys and (selected is None or key in selected)),
@@ -291,14 +394,21 @@ def build_report(config: dict, first: date, last: date) -> tuple[dict, list[str]
         )
         memberships = [paths[key] for key in membership_keys]
         creators = [" ".join(part for part in (c.get("firstName"), c.get("lastName") or c.get("name")) if part) for c in paper.get("creators") or []]
-        link = f"zotero://select/library/items/{paper['key']}"
+        resource_link = external_paper_link(paper)
+        if len(memberships) > 1:
+            collection_group = " + ".join(re.match(r"\d+", path.split(" / ")[-1]).group() if re.match(r"\d+", path.split(" / ")[-1]) else path.split(" / ")[-1] for path in memberships)
+        else:
+            collection_group = memberships[0].split(" / ")[-1] if memberships else "Unfiled"
+        group = status_group(status, config)
         inventory.append({
             "key": paper["key"],
             "title": paper.get("title") or "Untitled",
             "creators": creators,
             "date_added": paper.get("dateAdded") or "",
+            "date_added_day": local_periods(paper.get("dateAdded"), tz)["day"],
             "status": status,
-            "status_tags": tags.get("Status", []),
+            "status_group": group,
+            "status_tags": mapped_status_tags,
             "tags": tags,
             "collection_keys": membership_keys,
             "collections": memberships or ["Unfiled"],
@@ -306,29 +416,24 @@ def build_report(config: dict, first: date, last: date) -> tuple[dict, list[str]
             "annotation_activity_at": annotation_activity_at,
             "new_in_period": newly_added,
             "annotated_in_period": bool(recent_annotations),
-            "link": link,
+            "resource_link": resource_link,
         })
-        if not reasons:
-            continue
-        recent_annotations.sort(key=lambda a: (a["date_added"], a["key"]))
-        entries.append({
-            "key": paper["key"],
-            "title": paper.get("title") or "Untitled",
-            "item_type": paper.get("itemType"),
-            "creators": creators,
-            "date_added": paper.get("dateAdded") or "",
-            "date_modified": paper.get("dateModified") or "",
-            "reasons": sorted(set(reasons)),
-            "activity_at": max(activity_times),
-            "status": status,
-            "status_tags": tags.get("Status", []),
-            "collection_keys": membership_keys,
-            "collections": memberships or ["Unfiled"],
-            "tags": tags,
-            "annotations": recent_annotations,
-            "link": link,
-        })
-    entries.sort(key=lambda p: (p["activity_at"], p["title"]), reverse=True)
+        common = {
+            "paper_key": paper["key"], "paper_title": paper.get("title") or "Untitled",
+            "creators": creators, "status": status, "status_group": group,
+            "collections": memberships or ["Unfiled"], "collection_group": collection_group,
+            "collection_keys": membership_keys, "resource_link": resource_link,
+            "paper_tags": tags,
+        }
+        if newly_added:
+            activity.append({**common, "key": "paper:" + paper["key"], "type": "Paper added", "at": paper.get("dateAdded") or "", "day": local_periods(paper.get("dateAdded"), tz)["day"], "tags": tags})
+        for annotation in recent_annotations:
+            activity.append({**common, "key": "annotation:" + annotation["key"], "type": annotation["event_type"],
+                             "at": annotation["event_at"], "category": annotation["meaning"], "color": annotation["color"],
+                             "tags": tags, "annotation_tags": annotation["tags"]})
+            journal_entries.append({**common, **annotation, "category": annotation["meaning"]})
+    activity.sort(key=lambda event: (event["at"], event["key"]), reverse=True)
+    journal_entries.sort(key=lambda entry: (entry["event_at"], entry["key"]), reverse=True)
     inventory.sort(key=lambda p: (p["title"].casefold(), p["key"]))
     collection_list = [
         {
@@ -347,22 +452,78 @@ def build_report(config: dict, first: date, last: date) -> tuple[dict, list[str]
         "scope": {"papers": len(scoped), "multi_membership": multi_membership},
         "growth": growth,
         "pie": [{"name": name, "count": count} for name, count in sorted(pie.items(), key=lambda pair: (-pair[1], pair[0]))],
+        "size_events": [
+            {"day": day, "bucket": bucket, "count": count}
+            for (day, bucket), count in sorted(size_counts.items())
+        ],
         "color_legend": color_legend,
+        "status_roles": config["status_roles"],
+        "default_groupers": config["default_groupers"],
         "collections": collection_list,
         "inventory": inventory,
-        "entries": entries,
+        "activity": activity,
+        "journal": journal_entries,
     }, diagnostics
 
 
-def render_html(report: dict) -> str:
-    data = json.dumps(report, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+def safe_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+
+def export_window_report(report: dict) -> dict:
+    """Keep only papers with activity in the chosen export window."""
+    limited = copy.deepcopy(report)
+    active_keys = {event["paper_key"] for event in limited["activity"]}
+    limited["inventory"] = [paper for paper in limited["inventory"] if paper["key"] in active_keys]
+    paths = {collection["key"]: collection["path"] for collection in limited["collections"]}
+    pie = Counter()
+    months = Counter()
+    multi_membership = 0
+    for paper in limited["inventory"]:
+        memberships = [key for key in paper["collection_keys"] if key in paths]
+        if len(memberships) > 1:
+            multi_membership += 1
+            pie["Multiple collections"] += 1
+        elif memberships:
+            pie[paths[memberships[0]]] += 1
+        else:
+            pie["Unfiled"] += 1
+        if paper["date_added_day"]:
+            months[paper["date_added_day"][:7]] += 1
+    cumulative = 0
+    growth = []
+    for month in month_range(min(months), max(months)) if months else []:
+        cumulative += months[month]
+        growth.append({"month": month, "count": cumulative, "added": months[month]})
+    limited["scope"] = {"papers": len(limited["inventory"]), "multi_membership": multi_membership}
+    limited["growth"] = growth
+    limited["pie"] = [{"name": name, "count": count} for name, count in sorted(pie.items(), key=lambda pair: (-pair[1], pair[0]))]
+    return limited
+
+
+def render_html(report: dict, *, app_config: dict | None = None, app_catalog: dict | None = None, app_token: str = "") -> str:
     template = (HERE / "template.html").read_text(encoding="utf-8")
-    return template.replace("__JOURNAL_DATA__", data)
+    app_mode = app_config is not None
+    if not app_mode:
+        report = export_window_report(report)
+    controls = (HERE / "app-controls.html").read_text(encoding="utf-8") if app_mode else ""
+    app_js = (HERE / "app-ui.js").read_text(encoding="utf-8") if app_mode else ""
+    replacements = {
+        "__JOURNAL_DATA__": safe_json(report),
+        "__APP_CONFIG__": safe_json(app_config),
+        "__APP_CATALOG__": safe_json(app_catalog),
+        "__APP_TOKEN__": safe_json(app_token),
+        "__APP_CONTROLS__": controls,
+        "__JOURNAL_JS__": (HERE / "report-ui.js").read_text(encoding="utf-8"),
+        "__APP_JS__": app_js,
+    }
+    # Substitute once so a Zotero title matching a template marker stays ordinary data.
+    return re.sub("|".join(map(re.escape, replacements)), lambda match: replacements[match.group()], template)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=HERE / "config.json")
+    parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--from", dest="first", type=date.fromisoformat)
     parser.add_argument("--to", dest="last", type=date.fromisoformat)
     parser.add_argument("--out", type=Path, default=HERE / "report.html")
@@ -378,7 +539,7 @@ def main() -> int:
             for tag in sorted(entry["tag"] for entry in get_all("/tags") if entry["tag"].startswith(args.list_tags)):
                 print(tag)
             return 0
-        config = json.loads(args.config.read_text(encoding="utf-8"))
+        config = load_config(args.config)
         tz = ZoneInfo(config.get("timezone", "Asia/Shanghai"))
         today = datetime.now(tz).date()
         last = args.last or today
@@ -390,7 +551,8 @@ def main() -> int:
             print(f"Reading Journal warning: {diagnostic}", file=sys.stderr)
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(render_html(report), encoding="utf-8")
-        print(f"Wrote {args.out.resolve()} ({len(report['entries'])} entries, {report['scope']['papers']} papers in scope)")
+        active_papers = len({event["paper_key"] for event in report["activity"]})
+        print(f"Wrote {args.out.resolve()} ({len(report['journal'])} journal entries, {active_papers} papers active in the exported period)")
         return 0
     except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError) as error:
         print(f"Reading Journal: {error}", file=sys.stderr)

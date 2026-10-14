@@ -1,52 +1,45 @@
 # Reading Journal
 
-A small, local Python tool that reads the current Zotero library through its local API and writes a self-contained HTML research report. It makes no Zotero changes and keeps no history database.
+A private, read-only Zotero companion. The local app provides settings and a preview; it exports a single interactive HTML report that works without the app or network assets.
 
-## Run
+## Open the app
 
-1. Open Zotero and enable **Settings → Advanced → Allow other applications on this computer to communicate with Zotero**.
-2. From this directory, run `python3 journal.py`.
-3. Open `report.html` in a browser. It works offline after generation.
+The Apple Silicon build is `dist/Reading Journal.app.zip`. Extract it in Downloads or Applications, then open `Reading Journal.app`. The app opens its control interface in your browser. Keep Zotero open with its local API enabled. The **Quit** button stops the local server; it does not affect Zotero.
 
-The default report window is the last 30 days. To choose a range:
+The ZIP is the reliable macOS deliverable. The Documents file provider on this Mac attaches metadata to a loose `.app` copied into the project folder, invalidating its signature. The signed ZIP was verified after extraction outside Documents. This is a private local build, not a notarized public release. If macOS blocks the first launch, Control-click the extracted app and choose **Open**.
 
-```bash
-python3 journal.py --from 2026-10-01 --to 2026-10-31
-```
-
-To choose a different output file:
+To rebuild on this Mac, run:
 
 ```bash
-python3 journal.py --out /path/to/report.html
+sh build_app.sh
 ```
 
-The current version targets the personal library (`/api/users/0`). It reads items and collections with HTTP GET requests only. It does not read PDF files or full text; annotation text and comments come from Zotero's annotation records.
+The script uses Python 3.10, an isolated build environment, and PyInstaller. It produces and verifies the ZIP under `dist/`.
 
-## Configure
+## Use the app
 
-Edit `config.json` before generating a report. The starting scope is research collections **01–05** and their descendants; collection 06 (Research Notes & Framework) is excluded from paper statistics. Empty `included_collections` means all collections. Add Zotero collection keys to limit the scope; `include_descendants` includes child collections recursively. `include_unfiled` controls papers with no active collection when a scope is selected. Memberships referring to deleted collections are ignored.
+- **Dashboard:** period activity counts; a cumulative Collection Size chart with Month/Day resolution and an exact-date selector; a Papers by Subcollection pie; the annotation colour key; clickable current-status counts; and an expandable collection inventory with search, status filters, tags, and sorting.
+- **Activity Feed:** compact events for paper additions and annotation additions or modifications in the selected period. A paper metadata edit alone is not an event.
+- **Journal Entries:** one entry per annotation in the selected period, including comment-only annotations. Source quotations and comments stay separate. Toggle and reorder Status, Paper, Annotation category, Collection, Day, Week, and Month groupers; the default is Status → Paper → Category. Day, Week, and Month use the configured report timezone, and weeks run Monday–Sunday. A paper in multiple selected collections belongs to one combined collection group such as “02 + 04.”
 
-`annotation_colors` maps Zotero hex colors to journal meanings and descriptions. The six defaults come from the research framework. The complete legend appears in every report. Unknown colors remain visible as “Unmapped” with their original hex code.
+Use **Settings** to edit the date range, collection scope, paper types, timezone, annotation meanings, tag-category prefixes and allowlists, and exact reading-status tag mappings/appearance. Choose the timezone from the searchable dropdown; the current value is preserved until you save another choice. The collection picker is a tree: checking a parent includes descendants, while unchecking one node leaves its descendants selected. **Save grouping as default** stores the current Journal Entries grouping. Changes to mappings reinterpret the report; they never change Zotero records. App diagnostics flag noncanonical or conflicting tags.
 
-`tag_categories` maps category names to prefixes and optional allowlists. The default presets cover `status/*`, `approach/*`, `method/*`, `meeting/*`, and `priority/*`. Put exact tag names in `allowed_tags` to admit only those; an empty list admits every tag with that prefix. Tags outside the configured categories remain in Zotero but are not displayed in the report. The report does not infer tags from article content.
+**Refresh** queries Zotero again. **Export HTML** also refreshes and downloads a self-contained, three-page report. The export omits the app’s settings and Zotero-only links. Paper titles link to a DOI when available, otherwise to the paper URL; neither means plain text. Those optional paper links need the internet, but the report itself does not.
 
-The canonical primary reading tags are `status/to-read`, `status/reading`, and `status/read`; `status/revisit` is supplementary. The actual library currently contains `status/to_read` on one paper. The tool reports that as a command-line warning and does not treat it as `status/to-read` or change Zotero. Multiple primary statuses are also reported as warnings. Missing statuses remain “Unassigned.”
+Click the date range under **Reading Journal** to change the visible period. In the app, this reloads Zotero for the new dates. In an exported HTML file, the range can only be narrowed within the dates chosen at export; **Full range** restores that window. The date filter updates all three pages. The Collection Size chart includes a pre-period baseline, then shows cumulative paper additions within the chosen range. Click the line or choose an exact date to update the chart total and pie. Only papers with a paper-addition or annotation event in the exported window are embedded by title in the standalone file; collection-size aggregates remain available for the chart. To see earlier or later activity, make a new export with a wider window.
 
-Find the available names and keys with `python3 journal.py --list-collections` and `python3 journal.py --list-tags status/`.
+Settings are stored under `~/Library/Application Support/Reading Journal/config.json` after the first save. Before that, the project’s `config.json` is the seed. The CLI and app then read the same saved settings. The original research framework is untouched; `Research Framework — Application Alignment.md` records the application-specific interpretation.
 
-## What the first version means
+## Command-line export
 
-- The growth line counts selected papers cumulatively by their Zotero `dateAdded`, month by month. It is a current-library view: deleted or moved-out papers cannot be reconstructed.
-- The collection pie counts each paper once. Papers in several selected collections appear in a **Multiple collections** slice; their actual memberships remain visible on the paper card. The pie denominator equals the number of selected papers.
-- A dated entry is triggered by a paper's `dateAdded` or an annotation's `dateAdded`/`dateModified`. A paper's `dateModified` alone does not create a journal entry because a metadata edit does not establish reading activity.
-- Current tags and collection membership are shown for every entry. They are snapshots, not historical states.
-- Annotation counts in a dated report refer to annotations whose added or modified date falls in the selected interval.
-- The interface is in English. Highlighted source text and annotation comments are displayed separately and kept in their original language.
+```bash
+python3 journal.py --from 2026-10-01 --to 2026-10-14 --out report.html
+```
 
-Run the fixture checks with `python3 -m unittest discover -s tests -v`.
+The CLI can use `--config /path/to/config.json` to override saved settings. `--list-collections` and `--list-tags status/` show available Zotero names. The library source is the personal local API (`/api/users/0`); only HTTP GET is used. No PDF file or full text is read, and there is no change-history database or background polling.
 
-## Next decisions after using this report
+## Date and status semantics
 
-The main unresolved choice is the journal's narrative: should a professor-facing report lead with an activity timeline, with themes and questions, or with papers? The current report leads with papers and includes activity signals. A few real uses should decide this before building an editor, scheduler, or database.
+Collection Size counts papers in the *current* selected collection scope by their original `dateAdded`; the chart does not reconstruct past collection membership. Papers by Subcollection uses the same date cutoff and counts each paper once, with multi-membership in its own slice. Its legend omits the top-level collection name. The Dashboard inventory shows current status and collection membership for papers active in the selected period. Reading-status tags have no reliable assignment date, so **Read** and **Revisit** are never presented as dated events.
 
-Snapshots could later record deliberate report versions when generated, without a background process. That would allow comparisons between runs but would not recover changes made and reverted between runs. A live change log would require a watcher or Zotero plugin and is outside this first version.
+Run the checks with `python3 -m unittest discover -s tests -v`, `node tests/test_grouping.js`, and `node tests/test_collection_tree.js`.

@@ -5,6 +5,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import journal  # noqa: E402
@@ -60,6 +61,11 @@ class ApiTests(unittest.TestCase):
 
 
 class ReportTests(unittest.TestCase):
+    def test_annotation_calendar_groups_use_report_timezone_and_iso_week(self):
+        periods = journal.local_periods("2026-10-14T23:30:00Z", ZoneInfo("Asia/Shanghai"))
+        self.assertEqual(periods, {"day": "2026-10-15", "week": "2026-W42", "month": "2026-10"})
+        self.assertEqual(journal.local_periods("2021-01-01T12:00:00Z", ZoneInfo("UTC"))["week"], "2020-W53")
+
     def setUp(self):
         self.config = json.loads((journal.HERE / "config.json").read_text(encoding="utf-8"))
         self.config["included_collections"] = ["C01", "C04"]
@@ -99,33 +105,160 @@ class ReportTests(unittest.TestCase):
         report, diagnostics = self.build()
         self.assertEqual(report["scope"], {"papers": 4, "multi_membership": 1})
         self.assertEqual(sum(slice_["count"] for slice_ in report["pie"]), 4)
+        self.assertEqual(sum(event["count"] for event in report["size_events"]), 4)
+        self.assertEqual({event["bucket"] for event in report["size_events"]},
+                         {"Multiple collections", "Masters Research / 01 Vehicle Control", "Masters Research / 04 Testing"})
         self.assertEqual(next(s["count"] for s in report["pie"] if s["name"] == "Multiple collections"), 1)
-        self.assertEqual({entry["title"] for entry in report["entries"]}, {"Annotated paper", "New paper"})
+        self.assertEqual({event["paper_title"] for event in report["activity"]}, {"Annotated paper", "New paper"})
+        self.assertEqual({paper["title"] for paper in report["inventory"]},
+                         {"Annotated paper", "New paper", "Metadata only", "Old testing paper"})
         self.assertNotIn("Excluded note collection paper", json.dumps(report))
-        self.assertNotIn("Metadata only", json.dumps(report))
-        annotated = next(entry for entry in report["entries"] if entry["title"] == "Annotated paper")
-        self.assertEqual(annotated["reasons"], ["Annotation added", "Annotation modified"])
+        self.assertNotIn("Metadata only", json.dumps(report["activity"]))
+        self.assertEqual({c["key"] for c in report["collections"]}, {"C01", "C04"})
+        annotated = next(entry for entry in report["journal"] if entry["paper_title"] == "Annotated paper")
         self.assertEqual(annotated["status"]["label"], "Unassigned")
-        self.assertEqual(annotated["tags"]["Method"], ["method/simulation"])
+        self.assertEqual(annotated["periods"], {"day": "2026-10-14", "week": "2026-W42", "month": "2026-10"})
+        older_annotation = next(entry for entry in report["journal"] if entry["key"] == "ANNOT000")
+        self.assertEqual(older_annotation["added_periods"]["day"], "2026-09-01")
+        self.assertEqual(older_annotation["modified_periods"]["day"], "2026-10-14")
+        self.assertEqual(annotated["paper_tags"]["Method"], ["method/simulation"])
         self.assertNotIn("method/unlisted", json.dumps(report))
-        self.assertEqual(len(annotated["annotations"]), 7)
-        self.assertTrue(all(a["link"].startswith("zotero://open-pdf/library/items/ATTACH01?") for a in annotated["annotations"]))
+        self.assertEqual(len(report["journal"]), 7)
+        self.assertEqual(len(report["activity"]), 8)
+        self.assertEqual({event["type"] for event in report["activity"]},
+                         {"Paper added", "Annotation added", "Annotation modified"})
+        self.assertTrue(all(entry["paper_key"] == "PAPERA01" for entry in report["journal"]))
+        self.assertEqual({entry["collection_group"] for entry in report["journal"]}, {"01 + 04"})
+        self.assertNotIn("zotero://", json.dumps(report))
         self.assertEqual(len(report["color_legend"]), 7)
-        self.assertEqual({a["meaning"] for a in annotated["annotations"]},
+        self.assertEqual({a["meaning"] for a in report["journal"]},
                          {entry["label"] for entry in report["color_legend"]})
-        new = next(entry for entry in report["entries"] if entry["title"] == "New paper")
+        new = next(paper for paper in report["inventory"] if paper["title"] == "New paper")
         self.assertEqual(new["status"], {"label": "Read", "revisit": True})
         self.assertIn("status/read", new["tags"]["Status"])
+        inventory_new = next(p for p in report["inventory"] if p["key"] == "PAPERB01")
+        self.assertEqual(inventory_new["date_added_day"], "2026-10-14")
+        self.assertEqual(inventory_new["status_tags"], ["status/read", "status/revisit"])
+        self.assertTrue(inventory_new["new_in_period"])
+        self.assertFalse(inventory_new["annotated_in_period"])
+        inventory_annotated = next(p for p in report["inventory"] if p["key"] == "PAPERA01")
+        self.assertEqual(inventory_annotated["collection_keys"], ["C01", "C04"])
+        self.assertTrue(inventory_annotated["annotated_in_period"])
+        self.assertEqual(inventory_annotated["status_tags"], [])
         self.assertTrue(any("status/to_read" in message for message in diagnostics))
         self.assertTrue(any("conflicting primary statuses" in message for message in diagnostics))
 
+    def test_descendant_is_in_collection_inventory_and_metadata_edit_is_not_activity(self):
+        self.collections.append(collection("C011", "Child", "C01"))
+        self.items.append(item("PAPERCHD", "journalArticle", title="Child paper", collections=["C011"],
+                               dateAdded="2026-09-01T10:00:00Z", dateModified="2026-10-14T10:00:00Z", tags=[]))
+        report, _ = self.build()
+        child = next(c for c in report["collections"] if c["key"] == "C011")
+        self.assertEqual(child["parent_key"], "C01")
+        paper = next(p for p in report["inventory"] if p["key"] == "PAPERCHD")
+        self.assertEqual(paper["collection_keys"], ["C011"])
+        self.assertNotIn("PAPERCHD", {e["paper_key"] for e in report["activity"]})
+        self.assertEqual(sum(s["count"] for s in report["pie"]), report["scope"]["papers"])
+
+    def test_mixed_included_and_excluded_memberships_do_not_leak(self):
+        self.items[1]["data"]["collections"] = ["C01", "C06"]
+        report, _ = self.build()
+        paper = next(p for p in report["inventory"] if p["key"] == "PAPERB01")
+        self.assertEqual(paper["collection_keys"], ["C01"])
+        self.assertEqual(paper["collections"], ["Masters Research / 01 Vehicle Control"])
+        self.assertEqual(report["scope"]["multi_membership"], 1)
+        self.assertNotIn("C06", json.dumps(report))
+
     def test_html_is_self_contained_and_escapes_embedded_data(self):
         report, _ = self.build()
-        report["entries"][0]["title"] = "</script><script>alert(1)</script>"
+        next(paper for paper in report["inventory"] if paper["key"] == "PAPERA01")["title"] = "</script><script>alert(1)</script> __APP_CONFIG__"
         html = journal.render_html(report)
         self.assertEqual(html.count("<script>"), 1)
         self.assertNotIn("<script>alert(1)</script>", html)
+        self.assertIn("__APP_CONFIG__", html)
         self.assertNotRegex(html, re.compile(r"<(?:script|link)\b[^>]*(?:src|href)\s*=", re.I))
+        self.assertIn('id="view-feed"', html)
+        self.assertIn('id="view-dashboard"', html)
+        self.assertIn('id="view-journal"', html)
+        self.assertIn('id="range-dialog"', html)
+        self.assertIn('id="range-label"', html)
+        self.assertIn('id="status-summary"', html)
+        self.assertNotIn('id="settings-dialog"', html)
+        self.assertNotIn('<footer', html)
+        self.assertNotIn('Source: local Zotero API', html)
+
+    def test_export_omits_papers_without_activity_in_its_date_window(self):
+        report, _ = self.build()
+        limited = journal.export_window_report(report)
+        self.assertEqual({paper["key"] for paper in limited["inventory"]}, {"PAPERA01", "PAPERB01"})
+        self.assertEqual(limited["scope"]["papers"], 2)
+        self.assertEqual(sum(slice_["count"] for slice_ in limited["pie"]), 2)
+        self.assertEqual(sum(event["count"] for event in limited["size_events"]), 4)
+        self.assertEqual(len(report["inventory"]), 4)
+        html = journal.render_html(report)
+        self.assertNotIn("Metadata only", html)
+        self.assertNotIn("Old testing paper", html)
+
+    def test_collection_selection_can_skip_parent_and_keep_grandchild(self):
+        collections = [collection("ROOT", "Research"), collection("CHILD", "Child", "ROOT"),
+                       collection("GRAND", "Grandchild", "CHILD")]
+        config = dict(self.config, included_collections=["ROOT", "GRAND"], include_descendants=False)
+        self.assertEqual(journal.selected_collection_keys(config, collections), {"ROOT", "GRAND"})
+        config["included_collections"] = ["ROOT"]
+        config["include_descendants"] = True
+        self.assertEqual(journal.selected_collection_keys(config, collections), {"ROOT", "CHILD", "GRAND"})
+
+    def test_external_link_precedence_and_comment_only_annotation(self):
+        self.items[0]["data"]["DOI"] = "doi:10.1234/example.paper"
+        self.items[0]["data"]["url"] = "https://publisher.example/article"
+        self.items.append(item("ANNOTCOM", "annotation", parentItem="ATTACH01", annotationColor="#ffd400",
+                               annotationText="", annotationComment="A comment without a highlight", annotationPageLabel="8",
+                               dateAdded="2026-10-14T10:00:00Z", dateModified="2026-10-14T10:00:00Z", tags=[]))
+        report, _ = self.build()
+        self.assertEqual(next(p for p in report["inventory"] if p["key"] == "PAPERA01")["resource_link"],
+                         "https://doi.org/10.1234/example.paper")
+        comment = next(entry for entry in report["journal"] if entry["key"] == "ANNOTCOM")
+        self.assertEqual(comment["text"], "")
+        self.assertEqual(comment["comment"], "A comment without a highlight")
+        self.items[0]["data"]["DOI"] = "invalid"
+        report, _ = self.build()
+        self.assertEqual(next(p for p in report["inventory"] if p["key"] == "PAPERA01")["resource_link"],
+                         "https://publisher.example/article")
+
+    def test_configurable_status_tags_and_validation(self):
+        config = json.loads(json.dumps(self.config))
+        config["status_roles"]["to_read"]["tag"] = "status/to_read"
+        report, diagnostics = self.build_with_config(config)
+        paper = next(p for p in report["inventory"] if p["key"] == "PAPERA01")
+        self.assertEqual(paper["status"]["label"], "To read")
+        self.assertEqual(paper["status_tags"], ["status/to_read"])
+        self.assertFalse(any("PAPERA01: noncanonical" in warning for warning in diagnostics))
+        config["status_roles"]["reading"]["tag"] = "status/to_read"
+        with self.assertRaisesRegex(ValueError, "distinct"):
+            journal.validate_config(config)
+        config["status_roles"]["reading"]["tag"] = "status/reading"
+        config["status_roles"]["reading"]["label"] = "Unassigned"
+        with self.assertRaisesRegex(ValueError, "cannot be"):
+            journal.validate_config(config)
+        config["status_roles"]["reading"]["label"] = "Reading"
+        config["default_groupers"] = ["month", "week", "day", "paper"]
+        self.assertEqual(journal.validate_config(config)["default_groupers"], ["month", "week", "day", "paper"])
+
+    def test_annotation_modified_after_addition_uses_modification_timestamp(self):
+        annotation = next(entry for entry in self.items if entry["key"] == "ANNOT001")
+        annotation["data"]["dateAdded"] = "2026-10-14T09:00:00Z"
+        annotation["data"]["dateModified"] = "2026-10-14T10:00:00Z"
+        annotation["data"]["tags"] = [{"tag": "method/simulation"}]
+        report, _ = self.build()
+        entry = next(entry for entry in report["journal"] if entry["key"] == "ANNOT001")
+        self.assertEqual(entry["event_type"], "Annotation modified")
+        self.assertEqual(entry["event_at"], "2026-10-14T10:00:00Z")
+        event = next(event for event in report["activity"] if event["key"] == "annotation:ANNOT001")
+        self.assertEqual(event["annotation_tags"], ["method/simulation"])
+
+    def build_with_config(self, config):
+        with patch.object(journal, "get_all", side_effect=lambda route: self.items if route == "/items" else self.collections):
+            return journal.build_report(config, date(2026, 10, 14), date(2026, 10, 14))
 
 
 if __name__ == "__main__":
