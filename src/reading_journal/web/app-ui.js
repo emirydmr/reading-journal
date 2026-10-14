@@ -3,6 +3,36 @@ if (appConfig) {
   const checkbox=(host,value,label,checked)=>{const row=el('label'),input=el('input');input.type='checkbox';input.value=value;input.checked=checked;row.append(input,el('span','',label));host.append(row);};
   const field=(label,value,type='text')=>{const wrap=el('label','',label),input=el('input');input.type=type;input.value=value;wrap.append(input);return [wrap,input];};
   const dismiss=()=>dialog.close();
+  let paperTagState=null;
+  function renderPaperTags(){
+    const host=$('paper-tag-categories');host.replaceChildren();const known=new Set();
+    const category=(title,names,definitions={},fallback='#7b9185')=>{
+      const box=el('section','tag-editor-category'),heading=el('h3','',title),list=el('div','tag-toggle-list');box.append(heading,list);
+      if(!names.length)list.append(el('span','small','No tags defined'));
+      names.forEach(name=>{known.add(name);const detail=definitions[name]||{},color=validColor(detail.color)?detail.color:fallback;
+        const button=el('button','tag-toggle',detail.label||name.split('/').at(-1));button.type='button';button.title=name;button.setAttribute('aria-label',name);button.setAttribute('aria-pressed',String(paperTagState.selected.has(name)));
+        button.style.setProperty('--tag-color',color);button.style.setProperty('--tag-bg',color+'24');button.addEventListener('click',()=>{if(paperTagState.selected.has(name))paperTagState.selected.delete(name);else paperTagState.selected.add(name);button.setAttribute('aria-pressed',String(paperTagState.selected.has(name)));});list.append(button);
+      });host.append(box);
+    };
+    Object.entries(appCatalog.tag_categories||{}).forEach(([title,rule])=>{
+      const names=[...new Set([...Object.keys(rule.tags||{}),...appCatalog.tags.filter(tag=>rule.prefix&&tag.startsWith(rule.prefix)),...paperTagState.selected].filter(tag=>rule.tags?.[tag]||(rule.prefix&&tag.startsWith(rule.prefix))))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+      category(title,names,rule.tags,rule.color);
+    });
+    const other=[...new Set([...appCatalog.tags,...paperTagState.selected])].filter(name=>!known.has(name)).sort((a,b)=>a.localeCompare(b));
+    if(other.length)category('Other tags',other);
+  }
+  window.openPaperTagEditor=async(key,title)=>{
+    const tagDialog=$('paper-tag-dialog');$('paper-tag-title').textContent=title;$('paper-tag-error').textContent='Loading tags…';$('paper-tag-categories').replaceChildren();$('paper-tag-save').disabled=true;tagDialog.showModal();
+    try{const response=await fetch(`/paper-tags?token=${encodeURIComponent(appToken)}&key=${encodeURIComponent(key)}`);const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not load paper tags');
+      paperTagState={key,version:result.version,selected:new Set(result.tags)};renderPaperTags();$('paper-tag-error').textContent='';$('paper-tag-save').disabled=false;
+    }catch(error){$('paper-tag-error').textContent=error.message;}
+  };
+  $('paper-tag-close').addEventListener('click',()=>$('paper-tag-dialog').close());$('paper-tag-cancel').addEventListener('click',()=>$('paper-tag-dialog').close());
+  $('paper-tag-save').addEventListener('click',async()=>{if(!paperTagState)return;const button=$('paper-tag-save');button.disabled=true;$('paper-tag-error').textContent='Saving to Zotero…';
+    try{const response=await fetch('/paper-tags?token='+encodeURIComponent(appToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:paperTagState.key,version:paperTagState.version,tags:[...paperTagState.selected]})});
+      const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not save tags');window.location.reload();
+    }catch(error){$('paper-tag-error').textContent=error.message;button.disabled=false;}
+  });
   function trashButton(label,remove) {
     const button=el('button','icon-button');button.type='button';button.title=label;button.setAttribute('aria-label',label);
     const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');

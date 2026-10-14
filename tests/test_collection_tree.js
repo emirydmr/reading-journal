@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'tree-picker.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'reading_journal', 'web', 'tree-picker.js'), 'utf8');
 const context = vm.createContext({appConfig:null});
 vm.runInContext(source, context);
 context.collections = [

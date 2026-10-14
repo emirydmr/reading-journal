@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
-"""Local Reading Journal control app. Zotero is queried with GET only."""
+"""Local Reading Journal control app with user-authorized paper tag editing."""
 
 from __future__ import annotations
 
 import fcntl
 import html
 import json
+import re
 import secrets
 import threading
 import urllib.parse
 import urllib.request
+import urllib.error
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from zoneinfo import ZoneInfo, available_timezones
 
 import journal
+
+LOCAL_API = journal.API.rsplit("/users/0", 1)[0]
 
 
 def date_range(config: dict, query: dict[str, list[str]]) -> tuple[date, date]:
@@ -29,6 +33,46 @@ def date_range(config: dict, query: dict[str, list[str]]) -> tuple[date, date]:
 
 def library_snapshot() -> tuple[list[dict], list[dict], list[dict]]:
     return journal.get_all("/items"), journal.get_all("/collections"), journal.get_all("/tags")
+
+
+def paper_tag_snapshot(key: str) -> tuple[dict, str]:
+    if not re.fullmatch(r"[A-Z0-9]{8}", key):
+        raise ValueError("Invalid Zotero item key")
+    with urllib.request.urlopen(LOCAL_API + "/", timeout=15) as response:
+        server_id = response.headers.get("Zotero-Server-ID", "")
+    if not server_id:
+        raise ValueError("Zotero 10 local API is required for tag editing")
+    request = urllib.request.Request(journal.API + f"/items/{key}", headers={"Zotero-API-Version": "3", "Zotero-Server-ID": server_id})
+    with urllib.request.urlopen(request, timeout=15) as response:
+        item = json.load(response)
+    data = item.get("data", {})
+    if data.get("parentItem") or data.get("itemType") in ("annotation", "attachment", "note"):
+        raise ValueError("Only paper tags can be edited here")
+    return item, server_id
+
+
+def update_paper_tags(key: str, version: int, names: list[str]) -> list[str]:
+    if not isinstance(version, int) or not isinstance(names, list) or len(names) > 500 or any(not isinstance(name, str) or not name.strip() or len(name) > 255 for name in names):
+        raise ValueError("Invalid tag selection")
+    if len(set(names)) != len(names):
+        raise ValueError("Duplicate tags")
+    item, server_id = paper_tag_snapshot(key)
+    if item["version"] != version:
+        raise RuntimeError("This paper changed in Zotero. Reload its tags before saving.")
+    existing = {tag["tag"]: tag for tag in item["data"].get("tags", [])}
+    updated = [existing.get(name, {"tag": name}) for name in names]
+    if updated == item["data"].get("tags", []):
+        return names
+    auth_request = urllib.request.Request(LOCAL_API + "/local/authorize", data=json.dumps({"appName": "Reading Journal"}).encode(),
+        headers={"Content-Type": "application/json", "Zotero-Server-ID": server_id}, method="POST")
+    with urllib.request.urlopen(auth_request, timeout=90) as response:
+        authorization = json.load(response)
+    patch_request = urllib.request.Request(journal.API + f"/items/{key}", data=json.dumps({"tags": updated}).encode(), method="PATCH",
+        headers={"Content-Type": "application/json", "Zotero-API-Version": "3", "Zotero-Server-ID": server_id,
+                 "Zotero-API-Key": authorization["key"], "If-Unmodified-Since-Version": str(version)})
+    with urllib.request.urlopen(patch_request, timeout=30):
+        pass
+    return names
 
 
 def make_catalog(items: list[dict], collections: list[dict], tags: list[dict], config: dict, diagnostics: list[str]) -> dict:
@@ -100,10 +144,15 @@ def handler_factory(token: str):
             path, query = self.route()
             if path is None:
                 return
-            if path not in ("/", "/export"):
+            if path not in ("/", "/export", "/paper-tags"):
                 self.error("Not found", 404)
                 return
             try:
+                if path == "/paper-tags":
+                    item, _server_id = paper_tag_snapshot(query.get("key", [""])[0])
+                    body = json.dumps({"version": item["version"], "tags": [tag["tag"] for tag in item["data"].get("tags", [])]}).encode()
+                    self.respond(body, "application/json; charset=utf-8")
+                    return
                 config = journal.load_config()
                 first, last = date_range(config, query)
                 items, collections, tags = library_snapshot()
@@ -131,6 +180,21 @@ def handler_factory(token: str):
             if path == "/quit":
                 self.respond(b'{"ok":true}', "application/json; charset=utf-8")
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
+            if path == "/paper-tags":
+                try:
+                    size = int(self.headers.get("Content-Length", "0"))
+                    if size <= 0 or size > 100_000:
+                        raise ValueError("Invalid tag selection size")
+                    payload = json.loads(self.rfile.read(size))
+                    names = update_paper_tags(payload["key"], payload["version"], payload["tags"])
+                    self.respond(json.dumps({"tags": names}).encode(), "application/json; charset=utf-8")
+                except RuntimeError as exc:
+                    self.error(str(exc), 409)
+                except urllib.error.HTTPError as exc:
+                    self.error("Zotero rejected the change" if exc.code != 412 else "This paper changed in Zotero. Reload its tags before saving.", 409 if exc.code == 412 else exc.code)
+                except Exception as exc:
+                    self.error(str(exc))
                 return
             if path != "/settings":
                 self.error("Not found", 404)

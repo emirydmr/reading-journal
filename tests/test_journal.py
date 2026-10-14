@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src" / "reading_journal"))
 import journal  # noqa: E402
 
 
@@ -129,7 +129,8 @@ class ReportTests(unittest.TestCase):
                          {"Paper added", "Annotation added", "Annotation modified"})
         self.assertTrue(all(entry["paper_key"] == "PAPERA01" for entry in report["journal"]))
         self.assertEqual({entry["collection_group"] for entry in report["journal"]}, {"01 + 04"})
-        self.assertNotIn("zotero://", json.dumps(report))
+        self.assertEqual(report["journal"][0]["zotero_link"].split("?", 1)[0], "zotero://open-pdf/library/items/ATTACH01")
+        self.assertNotIn("zotero://", journal.render_html(report))
         self.assertEqual(len(report["color_legend"]), 7)
         self.assertEqual({a["meaning"] for a in report["journal"]},
                          {entry["label"] for entry in report["color_legend"]})

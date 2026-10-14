@@ -17,6 +17,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 HERE = Path(__file__).resolve().parent
+WEB = HERE / "web"
 API = "http://127.0.0.1:23119/api/users/0"
 PAGE_SIZE = 100
 DEFAULT_STATUS_ROLES = {
@@ -151,6 +152,21 @@ def external_paper_link(paper: dict) -> str:
     url = (paper.get("url") or "").strip()
     parsed = urllib.parse.urlparse(url)
     return url if parsed.scheme in ("http", "https") and parsed.netloc else ""
+
+
+def zotero_paper_link(key: str) -> str:
+    return f"zotero://select/library/items/{key}"
+
+
+def zotero_annotation_link(attachment_key: str, annotation_key: str, position: str = "") -> str:
+    query = {"annotation": annotation_key}
+    try:
+        page_index = json.loads(position).get("pageIndex")
+        if isinstance(page_index, int) and page_index >= 0:
+            query = {"page": str(page_index + 1), **query}
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return f"zotero://open-pdf/library/items/{attachment_key}?{urllib.parse.urlencode(query)}"
 
 
 def get_all(route: str) -> list[dict]:
@@ -418,6 +434,7 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
             modified_periods = local_periods(annotation.get("dateModified"), tz)
             recent_annotations.append({
                 "key": annotation["key"],
+                "zotero_link": zotero_annotation_link(annotation.get("parentItem", ""), annotation["key"], annotation.get("annotationPosition") or ""),
                 "text": annotation.get("annotationText") or "",
                 "comment": annotation.get("annotationComment") or "",
                 "color": raw_color,
@@ -470,12 +487,15 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
             "new_in_period": newly_added,
             "annotated_in_period": bool(recent_annotations),
             "resource_link": resource_link,
+            "zotero_link": zotero_paper_link(paper["key"]),
         })
         common = {
             "paper_key": paper["key"], "paper_title": paper.get("title") or "Untitled",
             "creators": creators, "status": status, "status_group": group,
             "collections": memberships or ["Unfiled"], "collection_group": collection_group,
             "collection_keys": membership_keys, "resource_link": resource_link,
+            "zotero_link": zotero_paper_link(paper["key"]),
+            "paper_zotero_link": zotero_paper_link(paper["key"]),
             "paper_tags": tags,
         }
         if newly_added:
@@ -536,6 +556,10 @@ def safe_json(value: object) -> str:
 def export_window_report(report: dict) -> dict:
     """Keep only papers with activity in the chosen export window."""
     limited = copy.deepcopy(report)
+    for section in ("inventory", "activity", "journal"):
+        for entry in limited[section]:
+            entry.pop("zotero_link", None)
+            entry.pop("paper_zotero_link", None)
     active_keys = {event["paper_key"] for event in limited["activity"]}
     limited["inventory"] = [paper for paper in limited["inventory"] if paper["key"] in active_keys]
     paths = {collection["key"]: collection["path"] for collection in limited["collections"]}
@@ -565,20 +589,20 @@ def export_window_report(report: dict) -> dict:
 
 
 def render_html(report: dict, *, app_config: dict | None = None, app_catalog: dict | None = None, app_token: str = "") -> str:
-    template = (HERE / "template.html").read_text(encoding="utf-8")
+    template = (WEB / "template.html").read_text(encoding="utf-8")
     app_mode = app_config is not None
     if not app_mode:
         report = export_window_report(report)
-    controls = (HERE / "app-controls.html").read_text(encoding="utf-8") if app_mode else ""
-    app_js = (HERE / "app-ui.js").read_text(encoding="utf-8") if app_mode else ""
+    controls = (WEB / "app-controls.html").read_text(encoding="utf-8") if app_mode else ""
+    app_js = (WEB / "app-ui.js").read_text(encoding="utf-8") if app_mode else ""
     replacements = {
         "__JOURNAL_DATA__": safe_json(report),
         "__APP_CONFIG__": safe_json(app_config),
         "__APP_CATALOG__": safe_json(app_catalog),
         "__APP_TOKEN__": safe_json(app_token),
         "__APP_CONTROLS__": controls,
-        "__JOURNAL_JS__": (HERE / "report-ui.js").read_text(encoding="utf-8"),
-        "__TREE_JS__": (HERE / "tree-picker.js").read_text(encoding="utf-8"),
+        "__JOURNAL_JS__": (WEB / "report-ui.js").read_text(encoding="utf-8"),
+        "__TREE_JS__": (WEB / "tree-picker.js").read_text(encoding="utf-8"),
         "__APP_JS__": app_js,
     }
     # Substitute once so a Zotero title matching a template marker stays ordinary data.
@@ -590,7 +614,7 @@ def main() -> int:
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--from", dest="first", type=date.fromisoformat)
     parser.add_argument("--to", dest="last", type=date.fromisoformat)
-    parser.add_argument("--out", type=Path, default=HERE / "report.html")
+    parser.add_argument("--out", type=Path, default=Path.cwd() / "output" / "report.html")
     parser.add_argument("--list-collections", action="store_true", help="Show active collection paths and keys")
     parser.add_argument("--list-tags", nargs="?", const="", metavar="PREFIX", help="Show tag names, optionally limited by prefix")
     args = parser.parse_args()
@@ -613,6 +637,7 @@ def main() -> int:
         report, diagnostics = build_report(config, first, last)
         for diagnostic in diagnostics:
             print(f"Reading Journal warning: {diagnostic}", file=sys.stderr)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(render_html(report), encoding="utf-8")
         active_papers = len({event["paper_key"] for event in report["activity"]})

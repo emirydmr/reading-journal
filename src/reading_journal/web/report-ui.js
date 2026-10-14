@@ -9,6 +9,7 @@ const option = (value, label) => { const node = el('option', '', label); node.va
 const fmt = iso => { if(!iso)return 'Unknown date'; try {return new Intl.DateTimeFormat('en-GB', {dateStyle:'medium', timeStyle:'short', timeZone:data.timezone}).format(new Date(iso));} catch {return 'Unknown date';} };
 const validColor = value => /^#[0-9a-f]{6}$/i.test(value || '');
 const paperLink = (title, url) => { const node = el(url ? 'a' : 'span', 'paper-title', title); if (url) {node.href=url;node.target='_blank';node.rel='noopener noreferrer';} return node; };
+const zoteroButton = (url,label='Open in Zotero',caption='Zotero') => {if(!appConfig||!url)return null;const link=el('a','zotero-button',caption);link.href=url;link.title=label;link.setAttribute('aria-label',label);return link;};
 const palette = ['#1e7464','#e1a64b','#5878b9','#af718f','#86a85d','#b88258','#708d9a','#b8aa64','#7d79b1','#c2706f'];
 const allGroupers = ['status','paper','category','collection','day','week','month'];
 let groupOrder = [...data.default_groupers,...allGroupers.filter(group=>!data.default_groupers.includes(group))];
@@ -107,7 +108,7 @@ function deriveRangeView(source,range) {
   const papersAdded=source.activity.filter(event=>event.type==='Paper added'&&inRange(event.day,range));
   const annotationEvents=journal.map(entry=>({paper_key:entry.paper_key,paper_title:entry.paper_title,creators:entry.creators,
     status_group:entry.status_group,collections:entry.collections,collection_group:entry.collection_group,collection_keys:entry.collection_keys,
-    resource_link:entry.resource_link,key:'annotation:'+entry.key,type:entry.event_type,at:entry.event_at,category:entry.category,
+    resource_link:entry.resource_link,zotero_link:entry.zotero_link,paper_zotero_link:entry.paper_zotero_link,key:'annotation:'+entry.key,type:entry.event_type,at:entry.event_at,category:entry.category,
     color:entry.color,tags:entry.paper_tags,annotation_tags:entry.tags}));
   const activity=[...papersAdded,...annotationEvents].sort((a,b)=>b.at.localeCompare(a.at)||b.key.localeCompare(a.key));
   const activeKeys=new Set(activity.map(event=>event.paper_key)),addedPaperKeys=new Set(papersAdded.map(event=>event.paper_key));
@@ -191,8 +192,8 @@ function statusPaint(paper) {
 function paperRow(paper) {
   const row=el('div','paper-row'),paint=statusPaint(paper);row.style.setProperty('--status-color',paint[0]);row.style.setProperty('--status-bg',paint[1]);
   const count=visibleData.annotationCounts.get(paper.key)||0;
-  const main=el('div');main.append(paperLink(paper.title,paper.resource_link),el('span','paper-meta',`${paper.creators.slice(0,2).join(', ')||'Unknown author'} · added ${fmt(paper.date_added)} · ${count} annotation${count===1?'':'s'} in range`));
-  const tags=el('div','status-tags'),names=[...new Set(Object.values(paper.tags).flat())];if(names.length)names.forEach(tag=>tags.append(tagChip(tag)));else tags.append(el('span','status-tag','No tags'));row.append(main,tags);return row;
+  const main=el('div');main.append(paperLink(paper.title,paper.resource_link));const open=zoteroButton(paper.zotero_link,`Open ${paper.title} in Zotero`);if(open)main.append(open);main.append(el('span','paper-meta',`${paper.creators.slice(0,2).join(', ')||'Unknown author'} · added ${fmt(paper.date_added)} · ${count} annotation${count===1?'':'s'} in range`));
+  const tags=el('div','status-tags'),names=[...new Set(Object.values(paper.tags).flat())];if(appConfig){(names.length?names:['No tags']).forEach(name=>{const trigger=el('button','status-tag tag-chip',name);trigger.type='button';trigger.title='Edit paper tags';const style=data.tag_styles?.[name];if(style){trigger.style.setProperty('--category-color',style.category_color);trigger.style.setProperty('--tag-color',style.color);trigger.style.setProperty('--tag-bg',style.color+'18');}trigger.addEventListener('click',()=>window.openPaperTagEditor(paper.key,paper.title));tags.append(trigger);});}else if(names.length)names.forEach(tag=>tags.append(tagChip(tag)));else tags.append(el('span','status-tag','No tags'));row.append(main,tags);return row;
 }
 function renderStatusSummary() {
   const host=$('status-summary');host.replaceChildren();
@@ -261,7 +262,7 @@ function renderFeed() {
     if(groups.size>1){const jump=el('button','collection-jump',`${name} · ${events.length}`);jump.type='button';jump.addEventListener('click',()=>openCollection(events[0].collection_keys));section.append(jump);}
     const list=el('div','panel');events.forEach(event=>{
       const row=el('div','event-row'),time=el('div','event-time',fmt(event.at)),main=el('div','event-main');
-      main.append(paperLink(event.paper_title,event.resource_link),el('span','badge',event.type));
+      main.append(paperLink(event.paper_title,event.resource_link));const paperOpen=zoteroButton(event.paper_zotero_link||event.zotero_link,'Open paper in Zotero');if(paperOpen)main.append(paperOpen);if(event.type!=='Paper added'){const annotationOpen=zoteroButton(event.zotero_link,'Open annotation in Zotero','Annotation ↗');if(annotationOpen)main.append(annotationOpen);}main.append(el('span','badge',event.type));
       if(event.category)main.append(el('span','badge',event.category));
       const state=el('span','small',`Now: ${event.status_group}`);row.append(time,main,state);list.append(row);
     });section.append(list);host.append(section);
@@ -270,7 +271,7 @@ function renderFeed() {
 
 function annotationCard(entry) {
   const card=el('article','journal-entry');if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);
-  const top=el('div','journal-top'),title=el('div');title.append(paperLink(entry.paper_title,entry.resource_link),el('span','badge',entry.category));
+  const top=el('div','journal-top'),title=el('div');title.append(paperLink(entry.paper_title,entry.resource_link));const paperOpen=zoteroButton(entry.paper_zotero_link,'Open paper in Zotero');if(paperOpen)title.append(paperOpen);const annotationOpen=zoteroButton(entry.zotero_link,'Open this annotation in Zotero','Annotation ↗');if(annotationOpen)title.append(annotationOpen);title.append(el('span','badge',entry.category));
   top.append(title,el('span','small',`${entry.event_type} · ${fmt(entry.event_at)}`));card.append(top);
   card.append(el('div','paper-meta',`Current status: ${entry.status_group} · Current collection: ${entry.collection_group} · p. ${entry.page}`));
   if(entry.text){card.append(el('div','paper-meta','Highlighted source text'),el('blockquote','',entry.text));}

@@ -1,4 +1,5 @@
 import json
+import io
 import sys
 import tempfile
 import threading
@@ -8,9 +9,46 @@ import urllib.request
 from pathlib import Path
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src" / "reading_journal"))
 import app  # noqa: E402
 import journal  # noqa: E402
+
+
+class PaperTagWriteTests(unittest.TestCase):
+    class Response:
+        def __init__(self, payload=None, headers=None):
+            self.body = io.BytesIO(json.dumps(payload).encode() if payload is not None else b"")
+            self.headers = headers or {}
+
+        def read(self, size=-1):
+            return self.body.read(size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    def test_tag_patch_preserves_unchanged_tag_data_and_uses_item_version(self):
+        item = {"version": 12, "data": {"itemType": "journalArticle", "tags": [{"tag": "status/read", "type": 1}, {"tag": "old"}]}}
+        responses = [self.Response(headers={"Zotero-Server-ID": "local-instance"}), self.Response(item),
+                     self.Response({"key": "authorized-key"}), self.Response()]
+        with patch.object(app.urllib.request, "urlopen", side_effect=responses) as send:
+            result = app.update_paper_tags("PAPERA01", 12, ["status/read", "method/test"])
+        self.assertEqual(result, ["status/read", "method/test"])
+        requests = [call.args[0] for call in send.call_args_list]
+        self.assertEqual([request.get_method() if hasattr(request, "get_method") else "GET" for request in requests], ["GET", "GET", "POST", "PATCH"])
+        self.assertEqual(json.loads(requests[3].data)["tags"], [{"tag": "status/read", "type": 1}, {"tag": "method/test"}])
+        self.assertEqual(requests[3].get_header("If-unmodified-since-version"), "12")
+        self.assertEqual(requests[3].get_header("Zotero-server-id"), "local-instance")
+
+    def test_stale_item_stops_before_authorization_or_write(self):
+        item = {"version": 13, "data": {"itemType": "journalArticle", "tags": []}}
+        responses = [self.Response(headers={"Zotero-Server-ID": "local-instance"}), self.Response(item)]
+        with patch.object(app.urllib.request, "urlopen", side_effect=responses) as send:
+            with self.assertRaisesRegex(RuntimeError, "Reload"):
+                app.update_paper_tags("PAPERA01", 12, ["status/read"])
+        self.assertEqual(send.call_count, 2)
 
 
 class AppServerTests(unittest.TestCase):

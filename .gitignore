@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 report.html
 report-*.html
+output/
 .venv-build*/
 build/
 dist/

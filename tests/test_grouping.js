@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'report-ui.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'reading_journal', 'web', 'report-ui.js'), 'utf8');
 const setup = source.slice(0, source.indexOf('function renderVisibleRange()'));
 const context = vm.createContext({
   document: {querySelectorAll:()=>[]},

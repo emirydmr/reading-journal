@@ -82,6 +82,16 @@
     .paper-meta { display: block; color: #66736d; font-size: .76rem; margin-top: 2px; }
     .status-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
     .status-tag,.badge { display: inline-block; background: white; border: 1px solid #d7e0d9; border-radius: 100px; padding: 2px 8px; color: #3c5149; font-size: .72rem; white-space: nowrap; }
+    button.status-tag { cursor: pointer; font: inherit; font-size: .72rem; }
+    button.status-tag:hover { border-color: #1e7464; }
+    .zotero-button { display: inline-block; margin-left: 8px; padding: 2px 7px; border: 1px solid #b7ccc1; border-radius: 5px; color: #1e6054; font-size: .69rem; font-weight: 700; text-decoration: none; vertical-align: baseline; white-space: nowrap; }
+    .zotero-button:hover { background: #e7f1eb; }
+    .tag-editor-categories { display: grid; gap: 12px; margin: 14px 0; }
+    .tag-editor-category { border: 1px solid #dce6dd; border-radius: 10px; padding: 12px; }
+    .tag-editor-category h3 { margin: 0 0 9px; font-size: .86rem; }
+    .tag-toggle-list { display: flex; flex-wrap: wrap; gap: 7px; }
+    .tag-toggle { border: 1px solid #cbd9cf; border-radius: 999px; background: #f8faf7; color: #35564a; padding: 6px 10px; font-size: .77rem; cursor: pointer; }
+    .tag-toggle[aria-pressed="true"] { border-color: var(--tag-color,#1e7464); background: var(--tag-bg,#eaf4ed); color: #173d39; font-weight: 700; }
     .badge { background: #eaf2ed; border: 0; }
     .feed-group { margin: 19px 0 26px; }
     .feed-group h2 { margin-bottom: 10px; }
@@ -215,6 +225,10 @@
       <p id="range-error" class="error" role="alert"></p>
       <div class="settings-actions"><button id="range-reset" class="secondary" type="button">Full range</button><button id="range-cancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Apply range</button></div>
     </form>
+  </dialog>
+  <dialog id="paper-tag-dialog" aria-labelledby="paper-tag-heading">
+    <div class="settings-head"><h2 id="paper-tag-heading">Paper tags</h2><button id="paper-tag-close" class="secondary" type="button">Close</button></div>
+    <div class="settings-content"><p id="paper-tag-title" class="help"></p><div id="paper-tag-categories" class="tag-editor-categories"></div><p id="paper-tag-error" class="error" role="alert"></p><div class="settings-actions"><button id="paper-tag-cancel" class="secondary" type="button">Cancel</button><button id="paper-tag-save" class="primary" type="button">Save tags to Zotero</button></div></div>
   </dialog>
   <main class="wrap">
     <section id="view-dashboard" class="view" aria-labelledby="dashboard-heading">

@@ -5,22 +5,18 @@ project_dir="$(pwd)"
 build_python="${READING_JOURNAL_PYTHON:-python3.10}"
 "$build_python" -m venv .venv-build-310
 .venv-build-310/bin/python -m pip install --upgrade pip
-.venv-build-310/bin/python -m pip install -r requirements-build.txt
+.venv-build-310/bin/python -m pip install -r packaging/requirements-build.txt
 build_dir="$(mktemp -d "${TMPDIR:-/tmp/}reading-journal-build.XXXXXX")"
 .venv-build-310/bin/python -m PyInstaller --noconfirm --clean --onedir --windowed \
   --name "Reading Journal" \
   --osx-bundle-identifier "local.readingjournal.app" \
-  --icon "$project_dir/assets/ReadingJournal.icns" \
+  --icon "$project_dir/assets/icons/ReadingJournal.icns" \
   --distpath "$build_dir/dist" \
   --workpath "$build_dir/work" \
   --specpath "$build_dir" \
-  --add-data "$project_dir/template.html:." \
-  --add-data "$project_dir/report-ui.js:." \
-  --add-data "$project_dir/tree-picker.js:." \
-  --add-data "$project_dir/app-ui.js:." \
-  --add-data "$project_dir/app-controls.html:." \
-  --add-data "$project_dir/config.json:." \
-  app.py
+  --add-data "$project_dir/src/reading_journal/web:web" \
+  --add-data "$project_dir/src/reading_journal/config.json:." \
+  src/reading_journal/app.py
 codesign --verify --deep --strict "$build_dir/dist/Reading Journal.app"
 mkdir -p dist
 ditto -c -k --keepParent "$build_dir/dist/Reading Journal.app" "dist/Reading Journal.app.zip"

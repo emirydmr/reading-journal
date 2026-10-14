@@ -14,7 +14,7 @@ def run_window(url, stop, stopped):
     from Cocoa import (
         NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
         NSButton, NSColor, NSFont, NSMakeRect, NSMenu, NSMenuItem, NSObject, NSAppearance, NSAppearanceNameAqua,
-        NSURL, NSURLRequest, NSSavePanel, NSModalResponseOK, NSAlert,
+        NSURL, NSURLRequest, NSSavePanel, NSModalResponseOK, NSAlert, NSWorkspace,
         NSTextField, NSTimer, NSTerminateNow, NSWindow,
         NSWindowStyleMaskTitled, NSWindowStyleMaskClosable, NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
     )
@@ -72,6 +72,9 @@ def run_window(url, stop, stopped):
                     threading.Thread(target=save_export, daemon=True).start()
             elif parsed.netloc == local_origin or destination == "about:blank":
                 decide(1)
+            elif parsed.scheme == "zotero":
+                decide(0)
+                NSWorkspace.sharedWorkspace().openURL_(NSURL.URLWithString_(destination))
             else:
                 decide(0)
                 webbrowser.open_new_tab(destination)
