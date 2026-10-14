@@ -41,10 +41,12 @@ function renderFilterPicker(id,nodes,keys,labels,render){
   const openBranches=new Map([...host.querySelectorAll('details.choice-branch')].map(branch=>[branch.dataset.key,branch.open]));
   const details=el('details','tag-filter'),summary=el('summary'),summaryText=el('span','filter-summary-text'),body=el('div','tag-filter-popover'),tree=el('div');host.replaceChildren();details.open=wasOpen;summary.append(summaryText);
   let selected=filterSelections.get(id);if(selected)selected=new Set([...selected].filter(key=>keys.has(key)));if(selected?.size===keys.size)selected=null;filterSelections.set(id,selected);
-  const updateLabel=()=>{const current=filterSelections.get(id);summaryText.textContent=current==null?labels.all:current.size===1?(nodes.find(node=>current.has(node.key))?.label||`1 ${labels.singular} selected`):`${current.size} ${labels.plural} selected`;all.setAttribute('aria-pressed',String(current==null));};
-  const all=el('button','filter-all');all.type='button';all.title=`Show all ${labels.plural}`;
-  all.append(el('span','filter-all-mark','✓'),el('span','filter-all-label','Show all'),el('span','filter-all-count',String(keys.size)));
-  all.addEventListener('click',()=>{filterSelections.set(id,null);renderFilterPicker(id,nodes,keys,labels,render);render();});body.append(all,tree);
+  const all=el('button','filter-all'),allText=el('span','filter-all-label');all.type='button';all.disabled=!keys.size;
+  const updateLabel=()=>{const current=filterSelections.get(id),everything=current==null;
+    summaryText.textContent=everything?labels.all:current.size===0?`No ${labels.plural}`:current.size===1?(nodes.find(node=>current.has(node.key))?.label||`1 ${labels.singular} selected`):`${current.size} ${labels.plural} selected`;
+    allText.textContent=everything?'Deselect all':'Select all';all.title=`${allText.textContent} ${labels.plural}`;all.setAttribute('aria-pressed',String(everything));};
+  all.append(el('span','filter-all-mark','✓'),allText,el('span','filter-all-count',String(keys.size)));
+  all.addEventListener('click',()=>{filterSelections.set(id,filterSelections.get(id)==null?new Set():null);renderFilterPicker(id,nodes,keys,labels,render);render();});body.append(all,tree);
   renderChoiceTree(tree,nodes,selected||new Set(nodes.map(node=>node.key)),chosen=>{const picked=new Set([...chosen].filter(key=>keys.has(key)));filterSelections.set(id,picked.size===keys.size?null:picked);updateLabel();render();});
   tree.querySelectorAll('details.choice-branch').forEach(branch=>{if(openBranches.has(branch.dataset.key))branch.open=openBranches.get(branch.dataset.key);});
   if(!keys.size)tree.append(el('p','small',`No ${labels.plural} in this range.`));details.append(summary,body);host.append(details);updateLabel();
