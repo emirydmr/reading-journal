@@ -10,6 +10,7 @@ build_dir="$(mktemp -d "${TMPDIR:-/tmp/}reading-journal-build.XXXXXX")"
 .venv-build-310/bin/python -m PyInstaller --noconfirm --clean --onedir --windowed \
   --name "Reading Journal" \
   --osx-bundle-identifier "local.readingjournal.app" \
+  --icon "$project_dir/assets/ReadingJournal.icns" \
   --distpath "$build_dir/dist" \
   --workpath "$build_dir/work" \
   --specpath "$build_dir" \
