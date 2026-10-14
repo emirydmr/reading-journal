@@ -4,7 +4,7 @@ A private, read-only Zotero companion. The local app provides settings and a pre
 
 ## Open the app
 
-The Apple Silicon build is `dist/Reading Journal.app.zip`. Extract it in Downloads or Applications, then open `Reading Journal.app`. The app opens its control interface in your browser. Keep Zotero open with its local API enabled. The **Quit** button stops the local server; it does not affect Zotero.
+The Apple Silicon build is `dist/Reading Journal.app.zip`. Extract it in Downloads or Applications, then open `Reading Journal.app`. A native Reading Journal window stays open with **Open in Browser** and **Quit** buttons. Closing this window, pressing Command-Q, or using the browser's **Quit** button stops the app and its local server. Keep Zotero open with its local API enabled.
 
 The ZIP is the reliable macOS deliverable. The Documents file provider on this Mac attaches metadata to a loose `.app` copied into the project folder, invalidating its signature. The signed ZIP was verified after extraction outside Documents. This is a private local build, not a notarized public release. If macOS blocks the first launch, Control-click the extracted app and choose **Open**.
 
@@ -14,7 +14,7 @@ To rebuild on this Mac, run:
 sh build_app.sh
 ```
 
-The script uses Python 3.10, an isolated build environment, and PyInstaller. It produces and verifies the ZIP under `dist/`.
+The script uses Python 3.10, an isolated build environment, PyInstaller, and the native macOS Cocoa interface through PyObjC. It produces and verifies the ZIP under `dist/`. To run the source after building, use `.venv-build-310/bin/python app.py`.
 
 ## Use the app
 

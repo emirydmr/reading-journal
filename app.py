@@ -9,6 +9,7 @@ import json
 import secrets
 import threading
 import urllib.parse
+import urllib.request
 import webbrowser
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -157,6 +158,7 @@ def handler_factory(token: str):
 
 
 def main() -> int:
+    from desktop import run_window
     settings_dir = journal.user_config_path().parent
     settings_dir.mkdir(parents=True, exist_ok=True)
     lock_path = settings_dir / "app.lock"
@@ -167,7 +169,17 @@ def main() -> int:
             lock.seek(0)
             try:
                 running = json.load(lock)
-                webbrowser.open_new_tab(f"http://127.0.0.1:{running['port']}/?token={urllib.parse.quote(running['token'])}")
+                url = f"http://127.0.0.1:{running['port']}/?token={urllib.parse.quote(running['token'])}"
+                stopped = threading.Event()
+                def stop_existing():
+                    try:
+                        request = urllib.request.Request(f"http://127.0.0.1:{running['port']}/quit?token={urllib.parse.quote(running['token'])}", data=b"", method="POST")
+                        with urllib.request.urlopen(request, timeout=3):
+                            pass
+                    except OSError:
+                        pass
+                    stopped.set()
+                run_window(url, stop_existing, stopped)
                 return 0
             except (ValueError, KeyError):
                 return 1
@@ -179,10 +191,23 @@ def main() -> int:
         lock.flush()
         url = f"http://127.0.0.1:{server.server_port}/?token={urllib.parse.quote(token)}"
         threading.Thread(target=webbrowser.open_new_tab, args=(url,), daemon=True).start()
-        try:
-            server.serve_forever()
-        finally:
+        stopped = threading.Event()
+        def serve():
+            try:
+                server.serve_forever(poll_interval=0.1)
+            finally:
+                stopped.set()
+        worker = threading.Thread(target=serve, daemon=True)
+        worker.start()
+        def stop():
+            if not stopped.is_set():
+                server.shutdown()
+            worker.join(timeout=3)
             server.server_close()
+        try:
+            run_window(url, stop, stopped)
+        finally:
+            stop()
     return 0
 
 
