@@ -228,7 +228,7 @@
   </style>
 </head>
 <body>
-  <header class="site-header"><div class="wrap header-inner">
+  <header id="site-header" class="site-header"><div class="wrap header-inner">
     <div class="brand"><strong>Reading Journal</strong><button id="range-label" class="range-toggle" type="button" aria-label="Filter report by date range"></button></div>
     <nav class="site-nav" aria-label="Pages">
       <button type="button" data-view="dashboard" aria-current="page">Dashboard</button>
@@ -300,9 +300,9 @@
     </section>
   </main>
   <script>
-    const data = __JOURNAL_DATA__;
+    let data = __JOURNAL_DATA__;
     const appConfig = __APP_CONFIG__;
-    const appCatalog = __APP_CATALOG__;
+    let appCatalog = __APP_CATALOG__;
     const appToken = __APP_TOKEN__;
     const zoteroIcon = "__ZOTERO_ICON__";
     __TREE_JS__

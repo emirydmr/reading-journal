@@ -119,7 +119,20 @@ if (appConfig) {
   $('settings-close').addEventListener('click',dismiss);$('settings-cancel').addEventListener('click',dismiss);
   $('add-color').addEventListener('click',()=>colorRow('#999999',{label:'New meaning',description:''}));
   $('add-category').addEventListener('click',()=>categoryRow('New category',{prefix:'new/',allowed_tags:[],tags:{},color:'#7b9185',selection_mode:'explicit'}));
-  $('app-refresh').addEventListener('click',()=>window.location.reload());
+  let refreshing=false,reportSignature=JSON.stringify([data,appCatalog]);
+  async function refreshJournal(){
+    if(refreshing)return;
+    refreshing=true;
+    try{
+      const query=`token=${encodeURIComponent(appToken)}&from=${encodeURIComponent(visibleRange.from)}&to=${encodeURIComponent(visibleRange.to)}`;
+      const response=await fetch(`/report?${query}`,{cache:'no-store'});
+      const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not refresh the journal');
+      const nextSignature=JSON.stringify([result.report,result.catalog]);
+      if(nextSignature!==reportSignature){updateJournalReport(result.report,result.catalog);reportSignature=nextSignature;}
+    }catch(error){window.alert(`Refresh failed: ${error.message}`);}
+    finally{refreshing=false;}
+  }
+  $('app-refresh').addEventListener('click',refreshJournal);
   const query=()=>`token=${encodeURIComponent(appToken)}&from=${encodeURIComponent($('setting-from').value||data.range.from)}&to=${encodeURIComponent($('setting-to').value||data.range.to)}`;
   $('app-export').addEventListener('click',()=>{window.location.href='/export?'+query();});
   $('app-quit').addEventListener('click',async()=>{await fetch('/quit?token='+encodeURIComponent(appToken),{method:'POST'});document.body.replaceChildren(el('main','wrap empty','Reading Journal has closed.'));});

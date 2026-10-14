@@ -37,7 +37,7 @@ const tagSelections=new Map();
 function matchesTagSelection(id,tags){const selection=tagSelections.get(id);return selection==null||tags.some(tag=>selection.has(tag));}
 function tagChip(tag){const chip=el('span','status-tag tag-chip',tag),style=data.tag_styles?.[tag];if(style){chip.title=style.category+' · '+style.label;chip.style.setProperty('--category-color',style.category_color);chip.style.setProperty('--tag-color',style.color);chip.style.setProperty('--tag-bg',style.color+'18');}return chip;}
 function renderTagFilter(id,names,render){
-  const host=$(id),details=el('details','tag-filter'),summary=el('summary'),body=el('div','tag-filter-popover'),tree=el('div');host.replaceChildren();
+  const host=$(id),wasOpen=Boolean(host.querySelector('details.tag-filter[open]')),details=el('details','tag-filter'),summary=el('summary'),body=el('div','tag-filter-popover'),tree=el('div');host.replaceChildren();details.open=wasOpen;
   let selected=tagSelections.get(id);if(selected)selected=new Set([...selected].filter(tag=>names.has(tag)));tagSelections.set(id,selected);
   const updateLabel=()=>summary.textContent=tagSelections.get(id)==null?'All tags':`${tagSelections.get(id).size} tags selected`;
   const all=el('button','secondary','All tags');all.type='button';all.addEventListener('click',()=>{tagSelections.set(id,null);renderTagFilter(id,names,render);render();});body.append(all,tree);
@@ -206,7 +206,7 @@ function statusPaint(paper) {
   return role ? [role.color,role.background] : ['#aab5af','#f7f8f6'];
 }
 function paperRow(paper) {
-  const row=el('div','paper-row'),paint=statusPaint(paper);row.style.setProperty('--status-color',paint[0]);row.style.setProperty('--status-bg',paint[1]);
+  const row=el('div','paper-row'),paint=statusPaint(paper);row.dataset.refreshKey=`paper:${paper.key}`;row.style.setProperty('--status-color',paint[0]);row.style.setProperty('--status-bg',paint[1]);
   const count=visibleData.annotationCounts.get(paper.key)||0;
   const main=el('div');main.append(paperLink(paper.title,paper.resource_link));const open=zoteroButton(paper.zotero_link,`Open ${paper.title} in Zotero`);if(open)main.append(open);main.append(el('span','paper-meta',`${paper.creators.slice(0,2).join(', ')||'Unknown author'} · added ${fmt(paper.date_added)} · ${count} annotation${count===1?'':'s'} in range`));
   const tags=el('div','status-tags'),names=[...new Set(Object.values(paper.tags).flat())];if(appConfig){(names.length?names:['No tags']).forEach(name=>{const trigger=el('button','status-tag tag-chip',name);trigger.type='button';trigger.title='Edit paper tags';const style=data.tag_styles?.[name];if(style){trigger.style.setProperty('--category-color',style.category_color);trigger.style.setProperty('--tag-color',style.color);trigger.style.setProperty('--tag-bg',style.color+'18');}trigger.addEventListener('click',()=>window.openPaperTagEditor(paper.key,paper.title));tags.append(trigger);});}else if(names.length)names.forEach(tag=>tags.append(tagChip(tag)));else tags.append(el('span','status-tag','No tags'));row.append(main,tags);return row;
@@ -241,11 +241,11 @@ function renderInventory() {
   });
   const compare={title:(a,b)=>a.title.localeCompare(b.title),newest:(a,b)=>b.date_added.localeCompare(a.date_added)||a.title.localeCompare(b.title),oldest:(a,b)=>a.date_added.localeCompare(b.date_added)||a.title.localeCompare(b.title),annotation:(a,b)=>(visibleData.latestAnnotationAt.get(b.key)||'').localeCompare(visibleData.latestAnnotationAt.get(a.key)||'')||a.title.localeCompare(b.title),status:(a,b)=>a.status_group.localeCompare(b.status_group)||a.title.localeCompare(b.title)};
   visible.sort(compare[sort]||compare.title);$('inventory-result').textContent=`${visible.length} of ${visibleData.inventory.length} papers visible`;
-  const host=$('collection-tree'),open=new Set([...host.querySelectorAll('details.collection-node[open]')].map(node=>node.dataset.key));host.replaceChildren();
+  const host=$('collection-tree'),previous=host.querySelector('details.collection-node'),open=new Set([...host.querySelectorAll('details.collection-node[open]')].map(node=>node.dataset.key));host.replaceChildren();
   const children=new Map();data.collections.forEach(collection=>{const parent=collection.parent_key||'';if(!children.has(parent))children.set(parent,[]);children.get(parent).push(collection);});
   const descendants=key=>[key,...(children.get(key)||[]).flatMap(child=>descendants(child.key))];
   function renderNode(collection,depth=0){
-    const details=el('details','collection-node');details.dataset.key=collection.key;details.open=open.has(collection.key)||depth===0;
+    const details=el('details','collection-node');details.dataset.key=collection.key;details.open=previous?open.has(collection.key):depth===0;
     const keys=new Set(descendants(collection.key)),total=visible.filter(paper=>paper.collection_keys.some(key=>keys.has(key))).length;
     const direct=visible.filter(paper=>paper.collection_keys.includes(collection.key));
     const summary=el('summary');summary.append(el('span','',collection.name),el('span','collection-count',`${total} in branch · ${direct.length} here`));details.append(summary);
@@ -257,7 +257,7 @@ function renderInventory() {
   const roots=children.get('')||[];
   roots.forEach(collection=>{const node=renderNode(collection);if(roots.length===1){node.classList.add('single-root');node.open=true;}host.append(node);});
   const unfiled=visible.filter(paper=>!paper.collection_keys.length);
-  if(unfiled.length){const details=el('details','collection-node');details.open=true;details.append(el('summary','','Unfiled · '+unfiled.length));const body=el('div','collection-body');unfiled.forEach(paper=>body.append(paperRow(paper)));details.append(body);host.append(details);}
+  if(unfiled.length){const details=el('details','collection-node');details.dataset.key='unfiled';details.open=previous?open.has('unfiled'):true;details.append(el('summary','','Unfiled · '+unfiled.length));const body=el('div','collection-body');unfiled.forEach(paper=>body.append(paperRow(paper)));details.append(body);host.append(details);}
   if(!host.childNodes.length)host.append(el('div','panel empty','No collections in scope.'));
 }
 function openCollection(keys) {
@@ -277,7 +277,7 @@ function renderFeed() {
     const section=el('section','feed-collection');
     if(groups.size>1){const jump=el('button','collection-jump',`${name} · ${events.length}`);jump.type='button';jump.addEventListener('click',()=>openCollection(events[0].collection_keys));section.append(jump);}
     const list=el('div','panel');events.forEach(event=>{
-      const row=el('div','event-row'),time=el('div','event-time',fmt(event.at)),main=el('div','event-main');
+      const row=el('div','event-row'),time=el('div','event-time',fmt(event.at)),main=el('div','event-main');row.dataset.refreshKey=`event:${event.key}`;
       const kind=el('strong','event-kind',event.type);kind.dataset.type=event.type;
       const subject=el('div','event-subject');subject.append(paperLink(event.paper_title,event.resource_link));main.append(kind,subject);
       if(event.category){const category=el('span','badge event-category',event.category);if(validColor(event.color))category.style.setProperty('--annotation-color',event.color);main.append(category);}
@@ -290,7 +290,7 @@ function renderFeed() {
 }
 
 function annotationCard(entry) {
-  const card=el('article','journal-entry');if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);
+  const card=el('article','journal-entry');card.dataset.refreshKey=`annotation:${entry.key}`;if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);
   const top=el('div','journal-top'),title=el('div');title.append(paperLink(entry.paper_title,entry.resource_link));const paperOpen=zoteroButton(entry.paper_zotero_link,'Open paper in Zotero');if(paperOpen)title.append(paperOpen);const annotationOpen=zoteroButton(entry.zotero_link,'Open this annotation in Zotero','Annotation ↗');if(annotationOpen)title.append(annotationOpen);title.append(el('span','badge',entry.category));
   top.append(title,el('span','small',`${entry.event_type} · ${fmt(entry.event_at)}`));card.append(top);
   card.append(el('div','paper-meta',`Current status: ${entry.status_group} · Current collection: ${entry.collection_group} · p. ${entry.page}`));
@@ -343,16 +343,16 @@ function renderGroupers() {
 function renderJournal() {
   const query=$('journal-search').value.toLocaleLowerCase(),category=$('journal-category').value,collection=$('journal-collection').value;
   const visible=visibleData.journal.filter(entry=>(!category||entry.category===category)&&(!collection||entry.collections.includes(collection))&&matchesTagSelection('journal-tag',[...entry.tags,...Object.values(entry.paper_tags).flat()])&&(!query||[entry.paper_title,entry.text,entry.comment,...entry.creators].join(' ').toLocaleLowerCase().includes(query)));
-  $('journal-result').textContent=`${visible.length} of ${visibleData.journal.length} annotations visible`;const host=$('journal-list');host.replaceChildren();
+  $('journal-result').textContent=`${visible.length} of ${visibleData.journal.length} annotations visible`;const host=$('journal-list'),closed=new Set([...host.querySelectorAll('details.journal-group:not([open])')].map(node=>node.dataset.groupKey));host.replaceChildren();
   if(!visible.length){host.append(el('div','panel empty','No annotations match these filters.'));return;}
   const dimensions=groupOrder.filter(group=>activeGroupers.has(group));
-  function level(tree){
+  function level(tree,path=[]){
     if(tree.entries){const leaf=el('div');tree.entries.forEach(entry=>leaf.append(annotationCard(entry)));return leaf;}
     const wrapper=el('div');
     tree.groups.forEach(group=>{
-      const details=el('details','journal-group');details.open=true;
+      const details=el('details','journal-group'),nextPath=[...path,`${dimensions[path.length]}:${group.key}`];details.dataset.groupKey=JSON.stringify(nextPath);details.open=!closed.has(details.dataset.groupKey);
       details.append(el('summary','',`${group.label} · ${group.count}`));
-      const body=el('div','journal-group-body');body.append(level(group.child));details.append(body);wrapper.append(details);
+      const body=el('div','journal-group-body');body.append(level(group.child,nextPath));details.append(body);wrapper.append(details);
     });return wrapper;
   }
   host.append(level(buildGroupTree(visible,dimensions)));
@@ -377,7 +377,7 @@ function refreshFilterOptions() {
 function renderVisibleRange() {
   visibleData=deriveRangeView(data,visibleRange);
   if(selectedSizeDate<visibleRange.from||selectedSizeDate>visibleRange.to)selectedSizeDate=visibleRange.to;
-  selectedSizeMonth=visibleRange.to.slice(0,7);
+  if(selectedSizeMonth<visibleRange.from.slice(0,7)||selectedSizeMonth>visibleRange.to.slice(0,7))selectedSizeMonth=visibleRange.to.slice(0,7);
   $('growth-month').replaceChildren(...sizePoints(visibleRange,'month').map(point=>option(point.label,monthName(point.label))));
   $('growth-date').min=visibleRange.from;$('growth-date').max=visibleRange.to;$('growth-date').value=selectedSizeDate;
   $('range-label').textContent=`${visibleRange.from} – ${visibleRange.to} ▾`;
@@ -387,6 +387,18 @@ function renderVisibleRange() {
   renderSizeCharts();
   refreshFilterOptions();
   renderStatusSummary();renderInventory();renderFeed();renderJournal();
+}
+function refreshPosition(){
+  const active=document.querySelector('.view:not([hidden])'),top=$('site-header').getBoundingClientRect().bottom;
+  const anchor=[...active.querySelectorAll('[data-refresh-key]')].find(node=>{const box=node.getBoundingClientRect();return box.bottom>top&&box.top<innerHeight;});
+  return {scrollY:window.scrollY,key:anchor?.dataset.refreshKey,top:anchor?.getBoundingClientRect().top,view:active.id};
+}
+function updateJournalReport(nextReport,nextCatalog){
+  const position=refreshPosition();data=nextReport;appCatalog=nextCatalog;visibleRange={...data.range};
+  drawLegend();renderVisibleRange();
+  const active=$(position.view),anchor=[...active.querySelectorAll('[data-refresh-key]')].find(node=>node.dataset.refreshKey===position.key);
+  const delta=anchor?anchor.getBoundingClientRect().top-position.top:0;
+  window.scrollTo({top:Math.max(0,position.scrollY+delta),behavior:'instant'});
 }
 const rangeDialog=$('range-dialog');
 function openRangeDialog() {
@@ -402,7 +414,7 @@ function applyRange(from,to) {
   if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||from>to){$('range-error').textContent='Choose a valid From and To date.';return;}
   if(appConfig){window.location.href=`/?token=${encodeURIComponent(appToken)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;return;}
   if(from<data.range.from||to>data.range.to){$('range-error').textContent='This export only contains the dates shown above. Export a wider period from the app.';return;}
-  visibleRange={from,to};rangeDialog.close();renderVisibleRange();
+  visibleRange={from,to};selectedSizeMonth=to.slice(0,7);rangeDialog.close();renderVisibleRange();
 }
 $('range-label').addEventListener('click',openRangeDialog);
 $('range-close').addEventListener('click',()=>rangeDialog.close());

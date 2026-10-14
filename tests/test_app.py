@@ -94,8 +94,16 @@ class AppServerTests(unittest.TestCase):
             self.assertNotIn('id="settings-dialog"', html)
             self.assertIn('id="range-dialog"', html)
             self.assertNotIn("zotero://", html)
+        with self.request(f"/report?token={self.token}&from=2026-10-01&to=2026-10-14") as response:
+            result = json.load(response)
+            self.assertEqual(response.headers["Content-Type"], "application/json; charset=utf-8")
+            self.assertEqual(result["report"]["range"], {"from": "2026-10-01", "to": "2026-10-14"})
+            self.assertIn("collections", result["catalog"])
         with self.assertRaises(urllib.error.HTTPError) as denied:
             self.request("/")
+        self.assertEqual(denied.exception.code, 403)
+        with self.assertRaises(urllib.error.HTTPError) as denied:
+            self.request("/report")
         self.assertEqual(denied.exception.code, 403)
 
     def test_settings_validation_and_save(self):

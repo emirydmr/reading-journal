@@ -144,7 +144,7 @@ def handler_factory(token: str):
             path, query = self.route()
             if path is None:
                 return
-            if path not in ("/", "/export", "/paper-tags"):
+            if path not in ("/", "/report", "/export", "/paper-tags"):
                 self.error("Not found", 404)
                 return
             try:
@@ -157,7 +157,10 @@ def handler_factory(token: str):
                 first, last = date_range(config, query)
                 items, collections, tags = library_snapshot()
                 report, diagnostics = journal.build_report(config, first, last, items=items, collections=collections)
-                if path == "/export":
+                if path == "/report":
+                    catalog = make_catalog(items, collections, tags, config, diagnostics)
+                    self.respond(json.dumps({"report": report, "catalog": catalog}, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+                elif path == "/export":
                     html = journal.render_html(report).encode("utf-8")
                     filename = f"Reading-Journal-{first.isoformat()}-to-{last.isoformat()}.html"
                     self.respond(html, "text/html; charset=utf-8", extra={"Content-Disposition": f'attachment; filename="{filename}"'})
