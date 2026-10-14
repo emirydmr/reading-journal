@@ -89,4 +89,12 @@ assert.equal(vm.runInContext("sizePieAt('2026-10-14').pie.reduce((sum,slice)=>su
 assert.equal(vm.runInContext("sizePieAt('2026-10-14').multiMembership",context),1);
 assert.deepEqual(Array.from(vm.runInContext("sizePoints({from:'2026-10-01',to:'2026-10-14'},'month')",context),point=>point.count),[2,4]);
 assert.deepEqual(Array.from(vm.runInContext("sizePoints({from:'2026-10-01',to:'2026-10-14'},'day')",context),point=>point.count).slice(0,7),[2,2,2,2,2,3,3]);
+context.data.size_events.push({day:'2026-10-25',bucket:'Research / 02 Testing',count:2});
+const monthPoints=vm.runInContext("sizePoints({from:'2026-10-14',to:'2026-10-14'},'month')",context);
+assert.equal(monthPoints.at(-1).day,'2026-10-31');
+assert.equal(monthPoints.at(-1).count,6);
+assert.equal(monthPoints[0].day,'2026-09-30');
+assert.equal(vm.runInContext("sizePoints({from:'2026-10-14',to:'2026-10-14'},'day').at(-1).count",context),4);
+assert.equal(vm.runInContext("monthLastDay('2024-02')",context),'2024-02-29');
+assert.equal(vm.runInContext("monthLastDay('2026-12')",context),'2026-12-31');
 console.log(`Grouping checks passed: ${checked} orders/subsets`);

@@ -221,7 +221,7 @@
         <div class="stat"><strong id="stat-journal">0</strong><span>Annotations in selected range</span></div>
       </div>
       <div class="charts">
-        <section class="panel"><div class="chart-head"><div><h2>Collection Size</h2><p class="help">Papers in the current collection scope, by date added.</p></div><div class="chart-controls"><label>Resolution<select id="growth-resolution"><option value="month">Month</option><option value="day">Day</option></select></label><label>Selected date<input id="growth-date" type="date"></label></div></div><div id="growth-selected-total" class="chart-total" aria-live="polite"></div><div id="growth-chart"></div></section>
+        <section class="panel"><div class="chart-head"><div><h2>Collection Size</h2><p class="help">Papers in the current collection scope, by date added.</p></div><div class="chart-controls"><label>Resolution<select id="growth-resolution"><option value="month">Month</option><option value="day">Day</option></select></label><label id="growth-month-control">Selected month<select id="growth-month"></select></label><label id="growth-date-control" hidden>Selected date<input id="growth-date" type="date"></label></div></div><div id="growth-selected-total" class="chart-total" aria-live="polite"></div><div id="growth-chart"></div></section>
         <section class="panel"><h2>Papers by Subcollection</h2><p class="help" id="pie-help"></p><div class="pie-layout"><div id="pie-chart"></div><ul id="pie-legend" class="legend-list"></ul></div></section>
       </div>
       <section class="panel section-space"><h2>Annotation color key</h2><div id="color-legend" class="color-grid"></div></section>

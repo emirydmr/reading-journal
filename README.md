@@ -18,7 +18,7 @@ The script uses Python 3.10, an isolated build environment, PyInstaller, and the
 
 ## Use the app
 
-- **Dashboard:** period activity counts; a cumulative Collection Size chart with Month/Day resolution and an exact-date selector; a Papers by Subcollection pie; the annotation colour key; clickable current-status counts; and an expandable collection inventory with search, status filters, tags, and sorting.
+- **Dashboard:** period activity counts; a cumulative Collection Size chart with Month/Day resolution; a Papers by Subcollection pie; the annotation colour key; clickable current-status counts; and an expandable collection inventory with search, status filters, tags, and sorting. Month mode shows a month picker, defaults to the latest month in the report range, and counts through that month's last day. Day mode shows an exact-date picker.
 - **Activity Feed:** compact events for paper additions and annotation additions or modifications in the selected period. A paper metadata edit alone is not an event.
 - **Journal Entries:** one entry per annotation in the selected period, including comment-only annotations. Source quotations and comments stay separate. Toggle and reorder Status, Paper, Annotation category, Collection, Day, Week, and Month groupers; the default is Status → Paper → Category. Day, Week, and Month use the configured report timezone, and weeks run Monday–Sunday. A paper in multiple selected collections belongs to one combined collection group such as “02 + 04.”
 

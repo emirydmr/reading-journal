@@ -16,6 +16,13 @@ let activeGroupers = new Set(data.default_groupers);
 let visibleRange = {...data.range};
 let visibleData;
 let selectedSizeDate = data.range.to;
+let selectedSizeMonth = data.range.to.slice(0,7);
+function monthLastDay(month){const [year,number]=month.split('-').map(Number);return new Date(Date.UTC(year,number,0)).toISOString().slice(0,10);}
+function monthName(month){return new Intl.DateTimeFormat('en-GB',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(month+'-01T12:00:00Z'));}
+function sizeSelectionCutoff(){return $('growth-resolution').value==='month'?monthLastDay(selectedSizeMonth):selectedSizeDate;}
+function sizeSelectionLabel(){return $('growth-resolution').value==='month'?`end of ${monthName(selectedSizeMonth)}`:selectedSizeDate;}
+function syncSizeControls(){const monthly=$('growth-resolution').value==='month';$('growth-month-control').hidden=!monthly;$('growth-date-control').hidden=monthly;$('growth-month').value=selectedSizeMonth;$('growth-date').value=selectedSizeDate;}
+function renderSizeCharts(){syncSizeControls();drawGrowth();const distribution=sizePieAt(sizeSelectionCutoff());drawPie(distribution.pie,distribution.multiMembership);}
 const tagSelections=new Map();
 function matchesTagSelection(id,tags){const selection=tagSelections.get(id);return selection==null||tags.some(tag=>selection.has(tag));}
 function tagChip(tag){const chip=el('span','status-tag tag-chip',tag),style=data.tag_styles?.[tag];if(style){chip.title=style.category+' · '+style.label;chip.style.setProperty('--category-color',style.category_color);chip.style.setProperty('--tag-color',style.color);chip.style.setProperty('--tag-bg',style.color+'18');}return chip;}
@@ -78,14 +85,14 @@ function sizePieAt(day) {
 }
 function sizePoints(range,resolution) {
   const points=[];
-  const before=new Date(Date.parse(range.from+'T12:00:00Z')-86400000).toISOString().slice(0,10);
-  if(sizeAt(before))points.push({label:before,day:before,count:sizeAt(before)});
+  const start=resolution==='month'?range.from.slice(0,7)+'-01':range.from;
+  const before=new Date(Date.parse(start+'T12:00:00Z')-86400000).toISOString().slice(0,10);
+  if(sizeAt(before))points.push({label:resolution==='month'?before.slice(0,7):before,day:before,count:sizeAt(before)});
   if(resolution==='month') {
     let month=range.from.slice(0,7);
     while(month<=range.to.slice(0,7)){
       const [year,number]=month.split('-').map(Number);
-      const monthEnd=new Date(Date.UTC(year,number,0)).toISOString().slice(0,10);
-      const day=monthEnd<range.to?monthEnd:range.to;
+      const day=monthLastDay(month);
       points.push({label:month,day,count:sizeAt(day)});
       month=new Date(Date.UTC(year,number,1)).toISOString().slice(0,7);
     }
@@ -126,33 +133,33 @@ document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener
 function drawGrowth() {
   const host=$('growth-chart');host.replaceChildren();
   const growth=sizePoints(visibleRange,$('growth-resolution').value);
-  const selectedTotal=sizeAt(selectedSizeDate);
-  $('growth-selected-total').textContent=`${selectedTotal} paper${selectedTotal===1?'':'s'} through ${selectedSizeDate}`;
+  const cutoff=sizeSelectionCutoff(),selectedTotal=sizeAt(cutoff),selectionLabel=sizeSelectionLabel();
+  $('growth-selected-total').textContent=`${selectedTotal} paper${selectedTotal===1?'':'s'} through ${selectionLabel}`;
   if (!growth.length) {host.append(el('div','chart-empty','No dates available.'));return;}
   const W=960,H=280,L=50,R=22,T=20,B=35,max=Math.max(1,...growth.map(point=>point.count));
   const ns='http://www.w3.org/2000/svg', svg=document.createElementNS(ns,'svg');
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('role','img');svg.setAttribute('tabindex','0');
-  svg.setAttribute('aria-label',`Collection size from ${growth[0].label} to ${growth.at(-1).label}. Click the chart or use arrow keys to select a date. ${selectedTotal} papers through ${selectedSizeDate}.`);
+  svg.setAttribute('aria-label',`Collection size from ${growth[0].label} to ${growth.at(-1).label}. Click the chart or use arrow keys to select a ${$('growth-resolution').value==='month'?'month':'date'}. ${selectedTotal} papers through ${selectionLabel}.`);
   const add=(kind,attributes,value)=>{const node=document.createElementNS(ns,kind);for(const [key,item] of Object.entries(attributes))node.setAttribute(key,item);if(value!==undefined)node.textContent=value;svg.append(node);};
   for(let i=0;i<=4;i++){const y=T+(H-T-B)*i/4;add('line',{x1:L,x2:W-R,y1:y,y2:y,stroke:'#dbe4de','stroke-width':1});add('text',{x:L-9,y:y+4,'text-anchor':'end',fill:'#718078','font-size':11},Math.round(max*(1-i/4)));}
   const points=growth.map((point,i)=>[L+(W-L-R)*(growth.length===1?.5:i/(growth.length-1)),T+(H-T-B)*(1-point.count/max)]);
   add('polygon',{points:`${points[0][0]},${H-B} ${points.map(point=>point.join(',')).join(' ')} ${points.at(-1)[0]},${H-B}`,fill:'#d9eee4'});
   add('polyline',{points:points.map(point=>point.join(',')).join(' '),fill:'none',stroke:'#1e7464','stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'});
   if(points.length<=36)points.forEach(([x,y])=>add('circle',{cx:x,cy:y,r:2.8,fill:'#1e7464'}));
-  const selectedIndex=growth.findIndex(point=>point.day>=selectedSizeDate);
+  const selectedIndex=growth.findIndex(point=>point.day>=cutoff);
   const markerIndex=selectedIndex<0?growth.length-1:selectedIndex;
   add('line',{x1:points[markerIndex][0],x2:points[markerIndex][0],y1:T,y2:H-B,stroke:'#ad7352','stroke-width':1.5,'stroke-dasharray':'4 4'});
   add('circle',{cx:points[markerIndex][0],cy:T+(H-T-B)*(1-selectedTotal/max),r:6,fill:'#ad7352',stroke:'white','stroke-width':2});
   add('text',{x:L,y:H-8,fill:'#718078','font-size':11},growth[0].label);
   add('text',{x:W-R,y:H-8,'text-anchor':'end',fill:'#718078','font-size':11},growth.at(-1).label);
-  const selectIndex=index=>{selectedSizeDate=growth[Math.max(0,Math.min(growth.length-1,index))].day;$('growth-date').value=selectedSizeDate;drawGrowth();const distribution=sizePieAt(selectedSizeDate);drawPie(distribution.pie,distribution.multiMembership);};
+  const selectIndex=index=>{const point=growth[Math.max(0,Math.min(growth.length-1,index))];if($('growth-resolution').value==='month')selectedSizeMonth=point.day.slice(0,7);else selectedSizeDate=point.day<visibleRange.from?visibleRange.from:point.day;renderSizeCharts();};
   svg.addEventListener('click',event=>{const bounds=svg.getBoundingClientRect(),x=(event.clientX-bounds.left)*W/bounds.width;selectIndex(growth.length===1?0:Math.round((x-L)/(W-L-R)*(growth.length-1)));});
   svg.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();selectIndex(markerIndex+(event.key==='ArrowRight'?1:-1));}});
   host.append(svg);
 }
 function drawPie(pie,multiMembership) {
   const host=$('pie-chart'),legend=$('pie-legend'),total=pie.reduce((sum,slice)=>sum+slice.count,0);host.replaceChildren();legend.replaceChildren();
-  $('pie-help').textContent=`Through ${selectedSizeDate} · each paper counted once${multiMembership?` · ${multiMembership} in multiple collections`:''}.`;
+  $('pie-help').textContent=`Through ${sizeSelectionLabel()} · each paper counted once${multiMembership?` · ${multiMembership} in multiple collections`:''}.`;
   if (!total) {host.append(el('div','chart-empty','No papers in scope.'));return;}
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 190 190');svg.setAttribute('role','img');svg.setAttribute('aria-label',`Distribution of ${total} papers across collections`);
   const circle=attrs=>{const node=document.createElementNS(ns,'circle');for(const [key,value] of Object.entries(attrs))node.setAttribute(key,value);svg.append(node);};
@@ -348,12 +355,14 @@ function refreshFilterOptions() {
 function renderVisibleRange() {
   visibleData=deriveRangeView(data,visibleRange);
   if(selectedSizeDate<visibleRange.from||selectedSizeDate>visibleRange.to)selectedSizeDate=visibleRange.to;
+  selectedSizeMonth=visibleRange.to.slice(0,7);
+  $('growth-month').replaceChildren(...sizePoints(visibleRange,'month').map(point=>option(point.label,monthName(point.label))));
   $('growth-date').min=visibleRange.from;$('growth-date').max=visibleRange.to;$('growth-date').value=selectedSizeDate;
   $('range-label').textContent=`${visibleRange.from} – ${visibleRange.to} ▾`;
   $('stat-scope').textContent=visibleData.inventory.length;
   $('stat-active').textContent=visibleData.addedPaperKeys.size;
   $('stat-journal').textContent=visibleData.journal.length;
-  drawGrowth();const distribution=sizePieAt(selectedSizeDate);drawPie(distribution.pie,distribution.multiMembership);
+  renderSizeCharts();
   refreshFilterOptions();
   renderStatusSummary();renderInventory();renderFeed();renderJournal();
 }
@@ -380,8 +389,9 @@ $('range-reset').addEventListener('click',()=>applyRange(data.range.from,data.ra
 $('range-form').addEventListener('submit',event=>{event.preventDefault();applyRange($('range-from').value,$('range-to').value);});
 for(const role of ['to_read','reading','read','revisit']){const item=$('inventory-filter').querySelector(`option[value="${role}"]`);item.textContent=data.status_roles[role].label;item.hidden=!data.status_roles[role].tag;}
 drawLegend();renderGroupers();renderVisibleRange();
-$('growth-resolution').addEventListener('change',drawGrowth);
-$('growth-date').addEventListener('change',()=>{const chosen=$('growth-date').value;if(chosen<visibleRange.from||chosen>visibleRange.to)return;selectedSizeDate=chosen;drawGrowth();const distribution=sizePieAt(selectedSizeDate);drawPie(distribution.pie,distribution.multiMembership);});
+$('growth-resolution').addEventListener('change',()=>{if($('growth-resolution').value==='month')selectedSizeMonth=visibleRange.to.slice(0,7);renderSizeCharts();});
+$('growth-month').addEventListener('change',()=>{selectedSizeMonth=$('growth-month').value;renderSizeCharts();});
+$('growth-date').addEventListener('change',()=>{const chosen=$('growth-date').value;if(chosen<visibleRange.from||chosen>visibleRange.to)return;selectedSizeDate=chosen;renderSizeCharts();});
 ['inventory-search','inventory-filter','inventory-sort','inventory-tag'].forEach(id=>$(id).addEventListener(id==='inventory-search'?'input':'change',renderInventory));
 ['feed-search','feed-type','feed-collection','feed-tag'].forEach(id=>$(id).addEventListener(id==='feed-search'?'input':'change',renderFeed));
 ['journal-search','journal-category','journal-collection','journal-tag'].forEach(id=>$(id).addEventListener(id==='journal-search'?'input':'change',renderJournal));
