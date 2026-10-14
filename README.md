@@ -6,9 +6,9 @@ Project layout: `src/reading_journal/` contains the Python app, seed configurati
 
 ## Open the app
 
-The Apple Silicon build is `dist/Reading Journal.app.zip`. Extract it in Downloads or Applications, then open `Reading Journal.app`. A native control window stays open with **Open Journal**, **Open in Browser**, and **Quit** buttons. **Open Journal** opens the interface in an app window; closing that journal window leaves the control window available. Closing the control window, pressing Command-Q, or using the journal's **Quit** button stops the app and its local server. Keep Zotero open with its local API enabled.
+The Apple Silicon build is `~/Applications/Reading Journal.app`; `dist/Reading Journal.app` is a shortcut to it. Open the app directly; the Journal window appears at launch. Closing the window, pressing Command-Q, or using the journal's **Quit** button stops the app and its local server. Keep Zotero open with its local API enabled.
 
-The ZIP is the reliable macOS deliverable. The Documents file provider on this Mac attaches metadata to a loose `.app` copied into the project folder, invalidating its signature. The signed ZIP was verified after extraction outside Documents. This is a private local build, not a notarized public release. If macOS blocks the first launch, Control-click the extracted app and choose **Open**.
+The app lives outside Documents because this Mac's Documents file provider adds metadata to app bundles there, invalidating their signatures. The build verifies the signature in Applications. This is a private local build, not a notarized public release. If macOS blocks the first launch, Control-click the app and choose **Open**.
 
 To rebuild on this Mac, run:
 
@@ -16,7 +16,7 @@ To rebuild on this Mac, run:
 sh build_app.sh
 ```
 
-The script uses Python 3.10, an isolated build environment, PyInstaller, and the native macOS Cocoa interface through PyObjC. It produces and verifies the ZIP under `dist/`. To run the source after building, use `.venv-build-310/bin/python src/reading_journal/app.py`.
+The script uses Python 3.10, an isolated build environment, PyInstaller, and the native macOS Cocoa interface through PyObjC. It produces and verifies the app in `~/Applications/` and places a shortcut under `dist/`. Add `--zip` only when you need a compressed copy for sharing. Quit the app before rebuilding. To run the source after building, use `.venv-build-310/bin/python src/reading_journal/app.py`.
 
 ## Use the app
 
