@@ -13,7 +13,8 @@ def run_window(url, stop, stopped):
     import objc
     from Cocoa import (
         NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
-        NSButton, NSColor, NSFont, NSMakeRect, NSMenu, NSMenuItem, NSObject, NSAppearance, NSAppearanceNameAqua,
+        NSButton, NSColor, NSFont, NSImage, NSMakeRect, NSMenu, NSMenuItem, NSObject, NSAppearance, NSAppearanceNameAqua,
+        NSBundle,
         NSURL, NSURLRequest, NSSavePanel, NSModalResponseOK, NSAlert, NSWorkspace,
         NSTextField, NSTimer, NSTerminateNow, NSWindow,
         NSWindowStyleMaskTitled, NSWindowStyleMaskClosable, NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
@@ -23,6 +24,11 @@ def run_window(url, stop, stopped):
 
     application = NSApplication.sharedApplication()
     application.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+    icon_path = NSBundle.mainBundle().pathForResource_ofType_("ReadingJournal", "icns")
+    if icon_path:
+        icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
+        if icon:
+            application.setApplicationIconImage_(icon)
     journal_window = None
     journal_view = None
     local_origin = urllib.parse.urlsplit(url).netloc
