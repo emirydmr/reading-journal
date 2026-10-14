@@ -39,12 +39,15 @@ function renderTagFilter(id,names,render){
 const inRange = (day, range) => Boolean(day) && range.from <= day && day <= range.to;
 function annotationInRange(entry, range) {
   const added=inRange(entry.added_periods?.day,range),modified=inRange(entry.modified_periods?.day,range);
+  const addedTime=Date.parse(entry.date_added),modifiedTime=Date.parse(entry.date_modified);
+  const creationEdit=Number.isFinite(addedTime)&&Number.isFinite(modifiedTime)&&modifiedTime>=addedTime&&modifiedTime-addedTime<=20*60*1000;
+  if(creationEdit&&!added)return null;
   if(!added&&!modified)return null;
-  const latestModification=modified&&(!added||entry.date_modified>entry.date_added);
+  const latestModification=!creationEdit&&modified&&(!added||entry.date_modified>entry.date_added);
   return {...entry,
-    event_type:latestModification?'Annotation modified':'Annotation added',
-    event_at:modified?entry.date_modified:entry.date_added,
-    periods:modified?entry.modified_periods:entry.added_periods,
+    event_type:latestModification?'Annotation updated':'Annotation created',
+    event_at:latestModification?entry.date_modified:entry.date_added,
+    periods:latestModification?entry.modified_periods:entry.added_periods,
   };
 }
 function growthFor(papers) {
@@ -266,8 +269,9 @@ function renderFeed() {
     if(groups.size>1){const jump=el('button','collection-jump',`${name} · ${events.length}`);jump.type='button';jump.addEventListener('click',()=>openCollection(events[0].collection_keys));section.append(jump);}
     const list=el('div','panel');events.forEach(event=>{
       const row=el('div','event-row'),time=el('div','event-time',fmt(event.at)),main=el('div','event-main');
-      main.append(paperLink(event.paper_title,event.resource_link));const paperOpen=zoteroButton(event.paper_zotero_link||event.zotero_link,'Open paper in Zotero');if(paperOpen)main.append(paperOpen);if(event.type!=='Paper added'){const annotationOpen=zoteroButton(event.zotero_link,'Open annotation in Zotero','Annotation ↗');if(annotationOpen)main.append(annotationOpen);}main.append(el('span','badge',event.type));
-      if(event.category)main.append(el('span','badge',event.category));
+      const kind=el('strong','event-kind',event.type);kind.dataset.type=event.type;
+      const subject=el('div','event-subject');subject.append(paperLink(event.paper_title,event.resource_link));const paperOpen=zoteroButton(event.paper_zotero_link||event.zotero_link,'Open paper in Zotero');if(paperOpen)subject.append(paperOpen);if(event.type!=='Paper added'){const annotationOpen=zoteroButton(event.zotero_link,'Open annotation in Zotero','Annotation ↗');if(annotationOpen)subject.append(annotationOpen);}
+      main.append(kind,subject);if(event.category)main.append(el('span','badge event-category',event.category));
       const state=el('span','small',`Now: ${event.status_group}`);row.append(time,main,state);list.append(row);
     });section.append(list);host.append(section);
   });

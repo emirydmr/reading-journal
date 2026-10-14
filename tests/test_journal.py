@@ -143,7 +143,7 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(len(report["journal"]), 9)
         self.assertEqual(len(report["activity"]), 10)
         self.assertEqual({event["type"] for event in report["activity"]},
-                         {"Paper added", "Annotation added", "Annotation modified"})
+                         {"Paper added", "Annotation created", "Annotation updated"})
         self.assertTrue(all(entry["paper_key"] == "PAPERA01" for entry in report["journal"]))
         self.assertEqual({entry["collection_group"] for entry in report["journal"]}, {"01 + 04"})
         self.assertEqual(report["journal"][0]["zotero_link"].split("?", 1)[0], "zotero://open-pdf/library/items/ATTACH01")
@@ -269,10 +269,26 @@ class ReportTests(unittest.TestCase):
         annotation["data"]["tags"] = [{"tag": "method/simulation"}]
         report, _ = self.build()
         entry = next(entry for entry in report["journal"] if entry["key"] == "ANNOT001")
-        self.assertEqual(entry["event_type"], "Annotation modified")
+        self.assertEqual(entry["event_type"], "Annotation updated")
         self.assertEqual(entry["event_at"], "2026-10-14T10:00:00Z")
         event = next(event for event in report["activity"] if event["key"] == "annotation:ANNOT001")
         self.assertEqual(event["annotation_tags"], ["method/simulation"])
+
+    def test_annotation_creation_grace_period(self):
+        tz = ZoneInfo("UTC")
+        added = "2026-10-14T09:00:00Z"
+        for modified, expected in (
+            ("2026-10-14T09:00:00Z", "Annotation created"),
+            ("2026-10-14T09:19:59Z", "Annotation created"),
+            ("2026-10-14T09:20:00Z", "Annotation created"),
+            ("2026-10-14T09:20:01Z", "Annotation updated"),
+        ):
+            with self.subTest(modified=modified):
+                event = journal.annotation_event({"dateAdded": added, "dateModified": modified}, tz, date(2026, 10, 14), date(2026, 10, 14))
+                self.assertEqual(event[0], expected)
+                self.assertEqual(event[1], added if expected == "Annotation created" else modified)
+        crossing_midnight = {"dateAdded": "2026-10-13T23:50:00Z", "dateModified": "2026-10-14T00:05:00Z"}
+        self.assertIsNone(journal.annotation_event(crossing_midnight, tz, date(2026, 10, 14), date(2026, 10, 14)))
 
     def build_with_config(self, config):
         with patch.object(journal, "get_all", side_effect=lambda route: self.items if route == "/items" else self.collections):

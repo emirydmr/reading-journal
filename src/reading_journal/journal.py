@@ -34,6 +34,22 @@ DEFAULT_STATUS_ROLES = {
 PRIMARY_STATUSES = {DEFAULT_STATUS_ROLES[role]["tag"]: DEFAULT_STATUS_ROLES[role]["label"] for role in ("to_read", "reading", "read")}
 SUPPLEMENTARY_STATUS = DEFAULT_STATUS_ROLES["revisit"]["tag"]
 GROUPERS = ("status", "paper", "category", "collection", "day", "week", "month")
+ANNOTATION_CREATION_GRACE = timedelta(minutes=20)
+
+
+def annotation_event(annotation: dict, tz: ZoneInfo, first: date, last: date) -> tuple[str, str] | None:
+    """Treat the first 20 minutes of edits as part of creating an annotation."""
+    added_at = annotation.get("dateAdded") or ""
+    modified_at = annotation.get("dateModified") or ""
+    if added_at and modified_at:
+        elapsed = datetime.fromisoformat(modified_at.replace("Z", "+00:00")) - datetime.fromisoformat(added_at.replace("Z", "+00:00"))
+        if timedelta(0) <= elapsed <= ANNOTATION_CREATION_GRACE:
+            return ("Annotation created", added_at) if is_in_window(added_at, tz, first, last) else None
+    if modified_at > added_at and is_in_window(modified_at, tz, first, last):
+        return "Annotation updated", modified_at
+    if is_in_window(added_at, tz, first, last):
+        return "Annotation created", added_at
+    return None
 
 
 def user_config_path() -> Path:
@@ -438,14 +454,13 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
             default="",
         )
         for annotation in all_annotations:
-            added = is_in_window(annotation.get("dateAdded"), tz, first, last)
-            modified = is_in_window(annotation.get("dateModified"), tz, first, last)
-            if not (added or modified):
+            event = annotation_event(annotation, tz, first, last)
+            if event is None:
                 continue
             raw_color = (annotation.get("annotationColor") or "").lower()
             if raw_color not in colors and not any(item["color"] == raw_color for item in color_legend):
                 color_legend.append({"color": raw_color, "label": "Unmapped", "description": "No meaning is configured for this annotation color."})
-            event_at = (annotation.get("dateModified") if modified else annotation.get("dateAdded")) or ""
+            event_type, event_at = event
             added_periods = local_periods(annotation.get("dateAdded"), tz)
             modified_periods = local_periods(annotation.get("dateModified"), tz)
             recent_annotations.append({
@@ -458,7 +473,7 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
                 "page": annotation.get("annotationPageLabel") or "?",
                 "date_added": annotation.get("dateAdded") or "",
                 "date_modified": annotation.get("dateModified") or "",
-                "event_type": "Annotation modified" if modified and (not added or annotation.get("dateModified", "") > annotation.get("dateAdded", "")) else "Annotation added",
+                "event_type": event_type,
                 "event_at": event_at,
                 "periods": local_periods(event_at, tz),
                 "added_periods": added_periods,

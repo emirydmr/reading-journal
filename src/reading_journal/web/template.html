@@ -103,11 +103,15 @@
     .feed-collection { margin-bottom: 18px; }
     .collection-jump { min-height: var(--control-height); border: 0; background: transparent; padding: 0; color: #17645d; font-size: .88rem; font-weight: 700; }
     .collection-jump:hover { text-decoration: underline; }
-    .event-row { display: grid; grid-template-columns: 145px 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid #e6ece6; }
+    .event-row { display: grid; grid-template-columns: 145px 1fr auto; gap: 12px; align-items: start; padding: 11px 14px; border-top: 1px solid #e6ece6; }
     .event-row:first-child { border-top: 0; }
     .event-main { min-width: 0; }
-    .event-main .paper-title { margin-right: 8px; }
-    .event-time { color: #687772; font-size: .78rem; }
+    .event-kind { display: inline-block; margin-bottom: 3px; color: #17645d; font-size: .84rem; font-weight: 800; }
+    .event-kind[data-type="Annotation updated"] { color: #976029; }
+    .event-kind[data-type="Paper added"] { color: #486ca2; }
+    .event-subject { line-height: 1.35; }
+    .event-category { margin-top: 5px; }
+    .event-time { color: #687772; font-size: .78rem; padding-top: 2px; }
     .groupers { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin: 12px 0; }
     .grouper { display: inline-flex; align-items: center; min-height: var(--control-height); border: 1px solid #b9d0c3; border-radius: var(--control-radius); background: #e6f1e9; color: #174d3d; }
     .grouper.inactive { background: #f4f6f2; color: #6c7770; border-color: #d8e0da; }
@@ -266,10 +270,10 @@
       </section>
     </section>
     <section id="view-feed" class="view" aria-labelledby="feed-heading" hidden>
-      <div class="page-head"><h1 id="feed-heading">Activity Feed</h1></div>
+      <div class="page-head"><div><h1 id="feed-heading">Activity Feed</h1><p class="help">Edits within 20 minutes of creating an annotation count as creation. Later changes appear as updates; Zotero does not identify which field changed.</p></div></div>
       <div class="controls">
         <label>Search<input id="feed-search" type="search" placeholder="Paper or author"></label>
-        <label>Event<select id="feed-type"><option value="">All events</option><option>Paper added</option><option>Annotation added</option><option>Annotation modified</option></select></label>
+        <label>Event<select id="feed-type"><option value="">All events</option><option>Paper added</option><option>Annotation created</option><option>Annotation updated</option></select></label>
         <label>Collection<select id="feed-collection"><option value="">All collections</option></select></label>
         <div class="field-label">Tags<div id="feed-tag"></div></div>
       </div>
