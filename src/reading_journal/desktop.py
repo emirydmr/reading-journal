@@ -14,6 +14,7 @@ def run_window(url, stop, stopped):
     from Cocoa import (
         NSApplication, NSApplicationActivationPolicyRegular, NSBackingStoreBuffered,
         NSImage, NSMakeRect, NSMenu, NSMenuItem, NSObject, NSAppearance, NSAppearanceNameAqua,
+        NSScrollElasticityNone,
         NSBundle,
         NSURL, NSURLRequest, NSSavePanel, NSModalResponseOK, NSAlert, NSWorkspace,
         NSTimer, NSTerminateNow, NSWindow,
@@ -47,6 +48,8 @@ def run_window(url, stop, stopped):
                 journal_window.setAppearance_(NSAppearance.appearanceNamed_(NSAppearanceNameAqua))
                 journal_view = WKWebView.alloc().initWithFrame_configuration_(journal_window.contentView().bounds(), WKWebViewConfiguration.alloc().init())
                 journal_view.setAutoresizingMask_(18)
+                journal_view.scrollView().setVerticalScrollElasticity_(NSScrollElasticityNone)
+                journal_view.scrollView().setHorizontalScrollElasticity_(NSScrollElasticityNone)
                 journal_view.setNavigationDelegate_(self)
                 journal_view.setUIDelegate_(self)
                 journal_window.setContentView_(journal_view)

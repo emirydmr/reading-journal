@@ -6,7 +6,7 @@
   <title>Reading Journal</title>
   <style>
     :root { font: 16px/1.5 system-ui,-apple-system,sans-serif; color: #202b36; background: #f5f6f3; --control-height: 40px; --control-radius: 8px; }
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; overscroll-behavior: none; }
     body { margin: 0; }
     button,input,select,textarea { font: inherit; }
     button { cursor: pointer; }
@@ -150,6 +150,10 @@
     #settings-dialog[open] { display: flex; flex-direction: column; }
     #settings-dialog .settings-head { position: static; flex: 0 0 auto; }
     #settings-dialog .settings-content { flex: 1; min-height: 0; max-height: none; overflow: auto; }
+    #paper-tag-dialog { height: min(900px,88vh); overflow: hidden; }
+    #paper-tag-dialog[open] { display: flex; flex-direction: column; }
+    #paper-tag-dialog .settings-head { position: static; flex: 0 0 auto; }
+    #paper-tag-dialog .settings-content { flex: 1; min-height: 0; max-height: none; overflow-y: auto; }
     .settings-footer { flex: 0 0 auto; padding: 12px 22px; background: white; border-top: 1px solid #dfe7df; }
     .settings-footer .settings-actions { margin: 0; }
     .settings-footer .error:not(:empty) { margin-bottom: 8px; }
