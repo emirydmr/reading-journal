@@ -88,7 +88,10 @@
     .zotero-button:hover { background: #e7f1eb; }
     .tag-editor-categories { display: grid; gap: 12px; margin: 14px 0; }
     .tag-editor-category { border: 1px solid #dce6dd; border-radius: 10px; padding: 12px; }
-    .tag-editor-category h3 { margin: 0 0 9px; font-size: .86rem; }
+    .tag-editor-category > summary { cursor: pointer; font-size: .86rem; font-weight: 700; }
+    .tag-editor-category[open] > summary { margin-bottom: 9px; }
+    .tag-editor-search { width: 100%; margin-bottom: 6px; }
+    .tag-editor-category .small { margin: 0 0 10px; }
     .tag-toggle-list { display: flex; flex-wrap: wrap; gap: 7px; }
     .tag-toggle { border: 1px solid #cbd9cf; border-radius: 999px; background: #f8faf7; color: #35564a; padding: 6px 10px; font-size: .77rem; cursor: pointer; }
     .tag-toggle[aria-pressed="true"] { border-color: var(--tag-color,#1e7464); background: var(--tag-bg,#eaf4ed); color: #173d39; font-weight: 700; }

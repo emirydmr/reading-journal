@@ -7,12 +7,15 @@ if (appConfig) {
   function renderPaperTags(){
     const host=$('paper-tag-categories');host.replaceChildren();const known=new Set();
     const category=(title,names,definitions={},fallback='#7b9185')=>{
-      const box=el('section','tag-editor-category'),heading=el('h3','',title),list=el('div','tag-toggle-list');box.append(heading,list);
+      const large=names.length>30,box=el('details','tag-editor-category'),heading=el('summary','',large?`${title} · ${names.length} tags`:title),list=el('div','tag-toggle-list');box.open=!large;box.append(heading);
+      let search=null;const revealed=new Set(),buttons=[];
+      const filter=()=>{if(!large)return;const query=search.value.trim().toLocaleLowerCase();buttons.forEach(({name,button})=>{button.hidden=!paperTagState.selected.has(name)&&!revealed.has(name)&&(!query||!name.toLocaleLowerCase().includes(query));});};
+      if(large){search=el('input','tag-editor-search');search.type='search';search.placeholder='Search tags to add';search.setAttribute('aria-label',`Search ${title} tags`);search.addEventListener('input',filter);box.append(search,el('p','small','Selected tags appear here. Search to add another.'));}
       if(!names.length)list.append(el('span','small','No tags defined'));
       names.forEach(name=>{known.add(name);const detail=definitions[name]||{},color=validColor(detail.color)?detail.color:fallback;
         const button=el('button','tag-toggle',detail.label||name.split('/').at(-1));button.type='button';button.title=name;button.setAttribute('aria-label',name);button.setAttribute('aria-pressed',String(paperTagState.selected.has(name)));
-        button.style.setProperty('--tag-color',color);button.style.setProperty('--tag-bg',color+'24');button.addEventListener('click',()=>{if(paperTagState.selected.has(name))paperTagState.selected.delete(name);else paperTagState.selected.add(name);button.setAttribute('aria-pressed',String(paperTagState.selected.has(name)));});list.append(button);
-      });host.append(box);
+        button.style.setProperty('--tag-color',color);button.style.setProperty('--tag-bg',color+'24');button.addEventListener('click',()=>{revealed.add(name);if(paperTagState.selected.has(name))paperTagState.selected.delete(name);else paperTagState.selected.add(name);button.setAttribute('aria-pressed',String(paperTagState.selected.has(name)));filter();});list.append(button);buttons.push({name,button});
+      });box.append(list);filter();host.append(box);
     };
     Object.entries(appCatalog.tag_categories||{}).forEach(([title,rule])=>{
       const names=[...new Set([...Object.keys(rule.tags||{}),...appCatalog.tags.filter(tag=>rule.prefix&&tag.startsWith(rule.prefix)),...paperTagState.selected].filter(tag=>rule.tags?.[tag]||(rule.prefix&&tag.startsWith(rule.prefix))))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
