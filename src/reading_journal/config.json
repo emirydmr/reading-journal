@@ -18,8 +18,11 @@
     "#5fb236": {"label": "Personal insights and ideas", "description": "Independent observations, possible applications, improvements, and emerging research ideas."},
     "#2ea8e5": {"label": "Questions and uncertainty", "description": "Unfamiliar concepts, unclear reasoning, unresolved questions, and knowledge gaps."},
     "#a28ae5": {"label": "Literature connections", "description": "Relationships to other papers, theories, methods, and research directions."},
-    "#f19837": {"label": "Methods and technical details", "description": "Algorithms, architectures, formulations, datasets, experimental designs, and evaluation metrics."}
+    "#e56eee": {"label": "Research gaps", "description": "Open problems, missing comparisons or evidence, and opportunities for new research."},
+    "#f19837": {"label": "Methods and technical details", "description": "Algorithms, architectures, formulations, datasets, experimental designs, and evaluation metrics."},
+    "#aaaaaa": {"label": "Needs verification", "description": "Claims, citations, or details to check against other sources before relying on them."}
   },
+  "annotation_color_schema_version": 2,
   "tag_categories": {
     "Approach": {"prefix": "approach/", "allowed_tags": ["approach/modeling", "approach/control", "approach/testing"]},
     "Method": {"prefix": "method/", "allowed_tags": ["method/simulation", "method/testing", "method/verification", "method/validation", "method/scenario-generation"]},

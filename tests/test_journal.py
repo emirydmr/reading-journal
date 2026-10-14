@@ -1,6 +1,7 @@
 import json
 import re
 import sys
+import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
@@ -61,6 +62,22 @@ class ApiTests(unittest.TestCase):
 
 
 class ReportTests(unittest.TestCase):
+    def test_new_colors_migrate_once_and_keep_user_edits(self):
+        raw = json.loads((journal.HERE / "config.json").read_text(encoding="utf-8"))
+        raw.pop("annotation_color_schema_version")
+        raw["annotation_colors"].pop("#aaaaaa")
+        raw["annotation_colors"]["#e56eee"]["label"] = "My research gap label"
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "config.json"
+            path.write_text(json.dumps(raw), encoding="utf-8")
+            migrated = journal.load_config(path)
+            self.assertEqual(migrated["annotation_colors"]["#e56eee"]["label"], "My research gap label")
+            self.assertEqual(migrated["annotation_colors"]["#aaaaaa"]["label"], "Needs verification")
+            self.assertNotIn("#aaaaaa", json.loads(path.read_text())["annotation_colors"])
+            migrated["annotation_colors"].pop("#aaaaaa")
+            path.write_text(json.dumps(migrated), encoding="utf-8")
+            self.assertNotIn("#aaaaaa", journal.load_config(path)["annotation_colors"])
+
     def test_annotation_calendar_groups_use_report_timezone_and_iso_week(self):
         periods = journal.local_periods("2026-10-14T23:30:00Z", ZoneInfo("Asia/Shanghai"))
         self.assertEqual(periods, {"day": "2026-10-15", "week": "2026-W42", "month": "2026-10"})
@@ -89,7 +106,7 @@ class ReportTests(unittest.TestCase):
                  tags=[{"tag": "status/reading"}, {"tag": "status/read"}]),
             item("ATTACH01", "attachment", parentItem="PAPERA01", title="PDF"),
         ]
-        for i, color in enumerate(["#ffd400", "#ff6666", "#5fb236", "#2ea8e5", "#a28ae5", "#f19837", "#123456"]):
+        for i, color in enumerate([*journal.ZOTERO_ANNOTATION_COLORS, "#123456"]):
             self.items.append(item(f"ANNOT{i:03}", "annotation", parentItem="ATTACH01", annotationColor=color,
                                    annotationText=f"Source passage {i}", annotationComment=f"Comment {i}",
                                    annotationPageLabel=str(i + 1), annotationPosition='{"pageIndex":1}', tags=[],
@@ -123,15 +140,15 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(older_annotation["modified_periods"]["day"], "2026-10-14")
         self.assertEqual(annotated["paper_tags"]["Method"], ["method/simulation"])
         self.assertNotIn("method/unlisted", json.dumps(report))
-        self.assertEqual(len(report["journal"]), 7)
-        self.assertEqual(len(report["activity"]), 8)
+        self.assertEqual(len(report["journal"]), 9)
+        self.assertEqual(len(report["activity"]), 10)
         self.assertEqual({event["type"] for event in report["activity"]},
                          {"Paper added", "Annotation added", "Annotation modified"})
         self.assertTrue(all(entry["paper_key"] == "PAPERA01" for entry in report["journal"]))
         self.assertEqual({entry["collection_group"] for entry in report["journal"]}, {"01 + 04"})
         self.assertEqual(report["journal"][0]["zotero_link"].split("?", 1)[0], "zotero://open-pdf/library/items/ATTACH01")
         self.assertNotIn("zotero://", journal.render_html(report))
-        self.assertEqual(len(report["color_legend"]), 7)
+        self.assertEqual([entry["color"] for entry in report["color_legend"]], [*journal.ZOTERO_ANNOTATION_COLORS, "#123456"])
         self.assertEqual({a["meaning"] for a in report["journal"]},
                          {entry["label"] for entry in report["color_legend"]})
         new = next(paper for paper in report["inventory"] if paper["title"] == "New paper")

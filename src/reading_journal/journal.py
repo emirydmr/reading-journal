@@ -20,6 +20,11 @@ HERE = Path(__file__).resolve().parent
 WEB = HERE / "web"
 API = "http://127.0.0.1:23119/api/users/0"
 PAGE_SIZE = 100
+ZOTERO_ANNOTATION_COLORS = ("#ffd400", "#ff6666", "#5fb236", "#2ea8e5", "#a28ae5", "#e56eee", "#f19837", "#aaaaaa")
+ADDITIONAL_ANNOTATION_MEANINGS = {
+    "#e56eee": {"label": "Research gaps", "description": "Open problems, missing comparisons or evidence, and opportunities for new research."},
+    "#aaaaaa": {"label": "Needs verification", "description": "Claims, citations, or details to check against other sources before relying on them."},
+}
 DEFAULT_STATUS_ROLES = {
     "to_read": {"tag": "status/to-read", "label": "To read", "color": "#87958d", "background": "#f3f5f2"},
     "reading": {"tag": "status/reading", "label": "Reading", "color": "#4c87bd", "background": "#edf5fb"},
@@ -40,7 +45,18 @@ def config_path() -> Path:
 
 
 def load_config(path: Path | None = None) -> dict:
-    return validate_config(json.loads((path or config_path()).read_text(encoding="utf-8")))
+    raw = json.loads((path or config_path()).read_text(encoding="utf-8"))
+    if raw.get("annotation_color_schema_version", 1) < 2:
+        raw.setdefault("annotation_colors", {})
+        for color, meaning in ADDITIONAL_ANNOTATION_MEANINGS.items():
+            raw["annotation_colors"].setdefault(color, meaning)
+        raw["annotation_color_schema_version"] = 2
+    return validate_config(raw)
+
+
+def annotation_color_sort_key(color: str) -> tuple[int, str]:
+    color = color.lower()
+    return (ZOTERO_ANNOTATION_COLORS.index(color) if color in ZOTERO_ANNOTATION_COLORS else len(ZOTERO_ANNOTATION_COLORS), color)
 
 
 def editable_tag_config(raw: dict) -> dict:
@@ -330,7 +346,7 @@ def annotation_color_legend(config: dict) -> tuple[dict[str, dict], list[dict]]:
             "label": meaning["label"],
             "description": meaning.get("description", ""),
         }
-    return colors, list(colors.values())
+    return colors, sorted(colors.values(), key=lambda item: annotation_color_sort_key(item["color"]))
 
 
 def is_in_window(value: str | None, tz: ZoneInfo, first: date, last: date) -> bool:
@@ -538,7 +554,7 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
             {"day": day, "bucket": bucket, "count": count}
             for (day, bucket), count in sorted(size_counts.items())
         ],
-        "color_legend": color_legend,
+        "color_legend": sorted(color_legend, key=lambda item: annotation_color_sort_key(item["color"])),
         "status_roles": config["status_roles"],
         "tag_styles": tag_styles,
         "default_groupers": config["default_groupers"],

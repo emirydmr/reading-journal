@@ -39,10 +39,13 @@ if (appConfig) {
     const path=document.createElementNS(ns,'path');path.setAttribute('d','M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7');path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','1.6');path.setAttribute('stroke-linecap','round');svg.append(path);button.append(svg);button.addEventListener('click',remove);return button;
   }
   function swatch(hex,label) {const input=el('input','editor-swatch');input.type='color';input.value=validColor(hex)?hex:'#7b9185';input.setAttribute('aria-label',label);return input;}
+  const zoteroColors=['#ffd400','#ff6666','#5fb236','#2ea8e5','#a28ae5','#e56eee','#f19837','#aaaaaa'];
+  const colorOrder=color=>{const index=zoteroColors.indexOf(color.toLowerCase());return index<0?zoteroColors.length:index;};
+  function sortColorRows(){const host=$('setting-colors');[...host.children].sort((a,b)=>colorOrder(a.editor.color.value)-colorOrder(b.editor.color.value)||a.editor.color.value.localeCompare(b.editor.color.value)).forEach(row=>host.append(row));}
   function colorRow(hex,meaning) {
     const row=el('div','editor-grid annotation-setting'),color=swatch(hex,'Annotation color');
     const [meaningWrap,meaningInput]=field('Meaning',meaning.label),[descriptionWrap,descriptionInput]=field('Description',meaning.description||'');
-    row.append(color,meaningWrap,descriptionWrap,trashButton('Remove annotation color',()=>row.remove()));row.editor={color,meaningInput,descriptionInput};$('setting-colors').append(row);
+    row.append(color,meaningWrap,descriptionWrap,trashButton('Remove annotation color',()=>row.remove()));row.editor={color,meaningInput,descriptionInput};$('setting-colors').append(row);color.addEventListener('change',sortColorRows);sortColorRows();
   }
   function categoryRow(name,rule) {
     const card=el('details','tag-category');const summary=el('summary','tag-category-heading'),dot=el('span','category-dot'),title=el('span','',name);dot.style.background=rule.color;summary.append(dot,title);card.append(summary);
