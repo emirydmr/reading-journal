@@ -162,9 +162,13 @@
     .tag-category-heading { padding: 13px 15px; cursor: pointer; color: #244f43; font-weight: 650; }
     .category-dot { display: inline-block; width: 13px; height: 13px; margin-right: 9px; border-radius: 4px; }
     .tag-category-body { padding: 0 12px 12px; }
-    .tag-inclusion { margin: 12px 0; padding: 8px 12px; background: #f5f8f4; border-radius: 8px; }
-    .tag-inclusion > summary { cursor: pointer; font-size: .83rem; font-weight: 650; }
+    .tag-future { display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: .8rem; }
     .tag-definitions { display: grid; gap: 8px; margin-bottom: 12px; }
+    .tag-definitions .choice-leaf,.tag-definitions .choice-branch { border: 1px solid #dce6dd; border-radius: 9px; }
+    .tag-definitions .choice-line { padding: 6px 12px; }
+    .tag-definitions .choice-leaf .choice-line { padding-left: 12px; }
+    .tag-definitions .tag-definition { margin: 0 8px 8px; }
+    .tag-definitions .choice-children { margin: 0 8px 8px 18px; }
     .scope-grid { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); align-items: stretch; gap: 14px; }
     .scope-panel { border: 1px solid #dce6dd; border-radius: 10px; overflow: hidden; }
     .scope-panel h4 { font-size: .8rem; margin: 0; padding: 11px 14px; background: #f0f5ef; }

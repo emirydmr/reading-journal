@@ -14,7 +14,7 @@ function tagTreeNodes(names,basePrefix='') {
   });
   return [...nodes.values()];
 }
-function renderChoiceTree(host,nodes,selected,onChange=()=>{}) {
+function renderChoiceTree(host,nodes,selected,onChange=()=>{},renderContent=null) {
   host.replaceChildren();const inputs=new Map(),children=new Map(),keys=new Set(nodes.map(node=>node.key));
   nodes.forEach(node=>{const parent=keys.has(node.parent_key)?node.parent_key:null;if(!children.has(parent))children.set(parent,[]);children.get(parent).push(node);});
   const current=()=>new Set([...inputs].filter(([,input])=>input.checked).map(([key])=>key));
@@ -25,6 +25,7 @@ function renderChoiceTree(host,nodes,selected,onChange=()=>{}) {
     input.addEventListener('click',event=>event.stopPropagation());
     input.addEventListener('change',()=>{const next=cascadeTreeSelection(current(),nodes,node.key,input.checked);for(const [key,control] of inputs)control.checked=next.has(key);onChange(current());});
     row.append(input);if(node.color){const dot=el('span','category-dot');dot.style.background=node.color;row.append(dot);}row.append(el('span','choice-name',node.label));if(below.length)row.append(el('span','choice-count',String(below.length)));box.append(row);
+    if(renderContent){const content=renderContent(node);if(content)box.append(content);}
     if(below.length){const body=el('div','choice-children');below.forEach(child=>body.append(branch(child,depth+1)));box.append(body);}
     return box;
   }

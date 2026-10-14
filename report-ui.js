@@ -164,13 +164,14 @@ function drawPie(pie,multiMembership) {
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 190 190');svg.setAttribute('role','img');svg.setAttribute('aria-label',`Distribution of ${total} papers across collections`);
   const circle=attrs=>{const node=document.createElementNS(ns,'circle');for(const [key,value] of Object.entries(attrs))node.setAttribute(key,value);svg.append(node);};
   circle({cx:95,cy:95,r:67,fill:'none',stroke:'#e7ede8','stroke-width':31});
-  let offset=0;const circumference=2*Math.PI*67;
+  let offset=0;const circumference=2*Math.PI*67,legendEntries=[];
   pie.forEach((slice,i)=>{
     const fraction=slice.count/total,color=palette[i%palette.length];
     circle({cx:95,cy:95,r:67,fill:'none',stroke:color,'stroke-width':31,'stroke-dasharray':`${fraction*circumference} ${circumference}`,'stroke-dashoffset':-offset*circumference,transform:'rotate(-90 95 95)'});
     offset+=fraction;
-    if(pie.length>1){const item=el('li'),dot=el('span','dot');dot.style.background=color;item.append(dot,el('span','',`${subcollectionLabel(slice.name)} · ${slice.count}`));legend.append(item);}
+    if(pie.length>1)legendEntries.push({slice,color,label:subcollectionLabel(slice.name)});
   });
+  legendEntries.sort((a,b)=>a.label.localeCompare(b.label,undefined,{numeric:true,sensitivity:'base'})).forEach(({slice,color,label})=>{const item=el('li'),dot=el('span','dot');dot.style.background=color;item.append(dot,el('span','',`${label} · ${slice.count}`));legend.append(item);});
   const center=document.createElementNS(ns,'text');for(const [key,value] of Object.entries({x:95,y:101,'text-anchor':'middle','font-size':29,'font-family':'Georgia,serif',fill:'#173d39'}))center.setAttribute(key,value);center.textContent=total;svg.append(center);host.append(svg);
 }
 function drawLegend() {

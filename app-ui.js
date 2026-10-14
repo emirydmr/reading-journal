@@ -19,28 +19,27 @@ if (appConfig) {
     const body=el('div','tag-category-body'),row=el('div','editor-grid'),color=swatch(rule.color,'Category color');
     const top=el('div','editor-pair'),[nameWrap,nameInput]=field('Category',name),[prefixWrap,prefixInput]=field('Prefix',rule.prefix||'');top.append(nameWrap,prefixWrap);
     const [descWrap,descInput]=field('Description',rule.description||'');row.append(color,top,descWrap,trashButton('Remove tag category',()=>card.remove()));body.append(row);
-    const picker=el('details','tag-inclusion');picker.append(el('summary','','Included tags'));const tree=el('div','tag-choice-tree');picker.append(tree);
-    const futureLabel=el('label','check-label'),future=el('input');future.type='checkbox';future.checked=rule.selection_mode==='prefix';futureLabel.append(future,el('span','','Include future tags with this prefix'));picker.append(futureLabel);body.append(picker);
-    const definitions=el('div','tag-definitions');body.append(definitions);const removed=new Set();let chosen=new Set(rule.allowed_tags||[]),getSelected=()=>chosen;
+    const futureLabel=el('label','check-label tag-future'),future=el('input');future.type='checkbox';future.checked=rule.selection_mode==='prefix';futureLabel.append(future,el('span','','Include future tags with this prefix'));body.append(futureLabel);
+    const definitions=el('div','tag-definitions');body.append(definitions);const rows=new Map(),removed=new Set();let chosen=new Set(rule.allowed_tags||[]),getSelected=()=>chosen;
     const matchingTags=prefix=>appCatalog.tags.filter(tag=>prefix?tag.startsWith(prefix):!Object.values(appCatalog.tag_categories).some(category=>category.prefix&&tag.startsWith(category.prefix)));
-    function refreshTree(){future.disabled=!prefixInput.value;if(future.disabled)future.checked=false;const names=[...new Set([...matchingTags(prefixInput.value),...[...definitions.children].map(node=>node.editor.key.value)])];
+    function refreshTree(){future.disabled=!prefixInput.value;if(future.disabled)future.checked=false;const names=[...new Set([...matchingTags(prefixInput.value).filter(tag=>!removed.has(tag)),...[...rows.values()].map(node=>node.editor.key.value)])];
       if(future.checked)chosen=new Set(names);removed.forEach(tag=>chosen.delete(tag));
-      getSelected=renderChoiceTree(tree,tagTreeNodes(names,prefixInput.value),chosen,selected=>{chosen=selected;future.checked=false;});
+      getSelected=renderChoiceTree(definitions,tagTreeNodes(names,prefixInput.value),chosen,selected=>{chosen=selected;future.checked=false;},node=>rows.get(node.key)||null);
     }
     function addTag(key,definition={}) {
       const tagRow=el('div','editor-grid tag-definition'),tagColor=swatch(definition.color||color.value,'Tag color');
       const first=el('div','editor-pair'),[keyWrap,keyInput]=field('Tag',key),[labelWrap,labelInput]=field('Meaning',definition.label||key.split('/').at(-1));first.append(keyWrap,labelWrap);
       const second=el('div','editor-pair'),[descriptionWrap,descriptionInput]=field('Description',definition.description||''),roleWrap=el('label','','Reading meaning'),role=el('select');
       [['','None'],['to_read','To read'],['reading','Reading'],['read','Read'],['revisit','Revisit']].forEach(([value,label])=>role.append(option(value,label)));role.value=definition.reading_role||'';roleWrap.append(role);second.append(descriptionWrap,roleWrap);
-      tagRow.append(tagColor,first,second,trashButton('Remove tag definition',()=>{removed.add(keyInput.value);chosen=getSelected();chosen.delete(keyInput.value);tagRow.remove();refreshTree();}));
-      tagRow.editor={key:keyInput,label:labelInput,color:tagColor,description:descriptionInput,role};definitions.append(tagRow);
-      keyInput.addEventListener('change',()=>{chosen=getSelected();chosen.delete(key);chosen.add(keyInput.value);refreshTree();});
+      tagRow.append(tagColor,first,second,trashButton('Remove tag definition',()=>{chosen=getSelected();removed.add(keyInput.value);chosen.delete(keyInput.value);rows.delete(keyInput.value);tagRow.remove();refreshTree();}));
+      tagRow.editor={key:keyInput,label:labelInput,color:tagColor,description:descriptionInput,role};rows.set(key,tagRow);
+      keyInput.addEventListener('change',()=>{chosen=getSelected();rows.delete(key);chosen.delete(key);rows.set(keyInput.value,tagRow);chosen.add(keyInput.value);refreshTree();});
     }
     const known=[...new Set([...Object.keys(rule.tags||{}),...matchingTags(rule.prefix)])].sort();known.forEach(tag=>addTag(tag,rule.tags?.[tag]||{}));
-    const add=el('button','secondary','Add tag');add.type='button';add.addEventListener('click',()=>{chosen=getSelected();let key=prefixInput.value+'new-tag',number=2;while([...definitions.children].some(node=>node.editor.key.value===key))key=prefixInput.value+'new-tag-'+number++;addTag(key);chosen.add(key);refreshTree();});body.append(add);
+    const add=el('button','secondary','Add tag');add.type='button';add.addEventListener('click',()=>{chosen=getSelected();let key=prefixInput.value+'new-tag',number=2;while(rows.has(key))key=prefixInput.value+'new-tag-'+number++;addTag(key);chosen.add(key);refreshTree();});body.append(add);
     nameInput.addEventListener('input',()=>title.textContent=nameInput.value);color.addEventListener('input',()=>dot.style.background=color.value);
     prefixInput.addEventListener('change',()=>{chosen=getSelected();refreshTree();});future.addEventListener('change',()=>{chosen=getSelected();refreshTree();});
-    card.append(body);card.editor={name:nameInput,prefix:prefixInput,color,description:descInput,definitions,future,selected:()=>getSelected()};$('setting-categories').append(card);refreshTree();
+    card.append(body);card.editor={name:nameInput,prefix:prefixInput,color,description:descInput,rows,future,selected:()=>getSelected()};$('setting-categories').append(card);refreshTree();
   }
   function fillCollectionTree() {
     renderChoiceTree($('setting-collections'),appCatalog.collections.map(item=>({...item,label:item.name})),new Set(appCatalog.selected_collections||[]));
@@ -97,7 +96,7 @@ if (appConfig) {
     next.default_groupers=groupOrder.filter(group=>activeGroupers.has(group));
     next.annotation_colors={};for(const row of $('setting-colors').children){const edit=row.editor,hex=edit.color.value.toLowerCase();if(next.annotation_colors[hex]){$('settings-error').textContent=`Duplicate annotation color: ${hex}`;return;}next.annotation_colors[hex]={label:edit.meaningInput.value.trim(),description:edit.descriptionInput.value.trim()};}
     next.tag_schema_version=2;next.tag_categories={};for(const card of $('setting-categories').children){const edit=card.editor,name=edit.name.value.trim();if(next.tag_categories[name]){$('settings-error').textContent=`Duplicate category: ${name}`;return;}
-      const tags={};for(const row of edit.definitions.children){const tag=row.editor,key=tag.key.value.trim();if(tags[key]){$('settings-error').textContent=`Duplicate tag: ${key}`;return;}tags[key]={label:tag.label.value.trim(),color:tag.color.value,description:tag.description.value.trim(),reading_role:tag.role.value};}
+      const tags={};for(const row of edit.rows.values()){const tag=row.editor,key=tag.key.value.trim();if(tags[key]){$('settings-error').textContent=`Duplicate tag: ${key}`;return;}tags[key]={label:tag.label.value.trim(),color:tag.color.value,description:tag.description.value.trim(),reading_role:tag.role.value};}
       next.tag_categories[name]={prefix:edit.prefix.value.trim(),color:edit.color.value,description:edit.description.value.trim(),selection_mode:edit.future.checked?'prefix':'explicit',allowed_tags:[...edit.selected()].filter(key=>!key.startsWith('@')),tags};}
     try{
       const response=await fetch('/settings?token='+encodeURIComponent(appToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:next,from:$('setting-from').value,to:$('setting-to').value})});
