@@ -277,7 +277,7 @@ function renderPaperOverview(){
   const entries=visibleData.journal.filter(entry=>entry.paper_key===paper.key);
   const head=el('div','paper-overview-head'),copy=el('div');copy.append(el('h2','',paper.title),el('p','paper-meta',`${paper.creators.join(', ')||'Unknown author'} · added ${fmt(paper.date_added)} · ${paper.status_group}`));head.append(copy);host.append(head);
   host.append(el('p','help',paper.collections.join(' · ')));
-  const actions=el('div','paper-overview-actions');actions.append(overviewLink('Open in Zotero',appConfig?paper.zotero_link:''),overviewLink('DOI',paper.doi_link),overviewLink('Website',paper.url_link));host.append(actions);
+  const actions=el('div','paper-overview-actions');actions.append(eventAction(paper.zotero_link,'Open paper in Zotero','paper')||overviewLink('Zotero',null),overviewLink('DOI',paper.doi_link),overviewLink('Website',paper.url_link));host.append(actions);
   const tags=el('section','paper-overview-section');tags.append(el('h3','','Tags'));const tagList=el('div','status-tags');tagList.style.justifyContent='flex-start';const names=[...new Set(Object.values(paper.tags).flat())];if(names.length)names.forEach(name=>tagList.append(tagChip(name)));else tagList.append(el('span','small','No tags'));tags.append(tagList);host.append(tags);
   if(paper.abstract){const section=el('section','paper-overview-section');section.append(el('h3','','Abstract'),el('p','paper-overview-abstract',paper.abstract));host.append(section);}
   else if(appConfig&&!appConfig.include_abstracts){const section=el('section','paper-overview-section');section.append(el('h3','','Abstract'),el('p','small','Not included. Enable abstracts in Settings to show them here and in exports.'));host.append(section);}
