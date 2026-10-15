@@ -15,7 +15,9 @@
     <div class="settings-grid">
       <label>From<input id="setting-from" type="date"></label>
       <label>To<input id="setting-to" type="date"></label>
-      <div class="timezone-setting"><label for="setting-timezone">Timezone</label><input id="setting-timezone-search" type="search" placeholder="Find a city or region" aria-label="Search timezones"><select id="setting-timezone" required></select><span id="setting-timezone-count" class="small"></span></div>
+      <label>Country or region<select id="setting-timezone-country" required></select></label>
+      <label>City<select id="setting-timezone" required></select></label>
+      <p id="setting-timezone-preview" class="timezone-preview small" aria-live="polite"></p>
       <label>Default window (days)<input id="setting-window" type="number" min="1"></label>
     </div>
     </section>

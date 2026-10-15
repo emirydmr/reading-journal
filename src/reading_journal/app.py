@@ -81,6 +81,7 @@ def make_catalog(items: list[dict], collections: list[dict], tags: list[dict], c
     types = {entry["data"].get("itemType", "") for entry in items if not entry["data"].get("parentItem")}
     types |= set(config.get("paper_types", []))
     timezones = sorted(available_timezones() | {config.get("timezone", "Asia/Shanghai")})
+    locations = timezone_locations(timezones)
     categories = journal.editable_tag_config(config)["tag_categories"]
     names = {entry.get("tag", "") for entry in tags if entry.get("tag")}
     unmatched = sorted(tag for tag in names if not any(rule["prefix"] and tag.startswith(rule["prefix"]) for rule in categories.values()))
@@ -100,9 +101,35 @@ def make_catalog(items: list[dict], collections: list[dict], tags: list[dict], c
         "paper_types": sorted(name for name in types if name and name not in ("annotation", "attachment", "note")),
         "tags": sorted({entry.get("tag", "") for entry in tags if entry.get("tag")}),
         "timezones": timezones,
+        "timezone_locations": locations,
         "tag_categories": categories,
         "diagnostics": diagnostics,
     }
+
+
+def timezone_locations(timezones: list[str]) -> list[dict[str, str]]:
+    """Offer country and city labels while retaining IANA IDs for persistence."""
+    names = set(timezones)
+    locations = []
+    table = Path("/usr/share/zoneinfo/zone.tab")
+    try:
+        rows = table.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        rows = []
+    for row in rows:
+        if not row or row.startswith("#"):
+            continue
+        fields = row.split("\t")
+        if len(fields) < 3 or fields[2] not in names:
+            continue
+        country, _, zone = fields[:3]
+        city = zone.split("/", 1)[-1].replace("_", " ").replace("/", " · ")
+        locations.append({"country": country, "city": city, "zone": zone})
+    known = {item["zone"] for item in locations}
+    for zone in timezones:
+        if zone not in known:
+            locations.append({"country": "", "city": zone.replace("_", " "), "zone": zone})
+    return locations
 
 
 def save_config(config: dict, destination: Path | None = None) -> None:

@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'reading_journal', 'web', 'report-ui.js'), 'utf8');
 const setup = source.slice(0, source.indexOf('function renderVisibleRange()'));
 const context = vm.createContext({
-  document: {querySelectorAll:()=>[]},
+  document: {querySelectorAll:()=>[],getElementById:()=>({addEventListener:()=>{}})},
   data: {
     range: {from:'2026-10-01',to:'2026-10-14'},
     default_groupers: ['status', 'paper', 'category'],
@@ -105,4 +105,17 @@ assert.equal(monthPoints[0].day,'2026-09-30');
 assert.equal(vm.runInContext("sizePoints({from:'2026-10-14',to:'2026-10-14'},'day').at(-1).count",context),4);
 assert.equal(vm.runInContext("monthLastDay('2024-02')",context),'2024-02-29');
 assert.equal(vm.runInContext("monthLastDay('2026-12')",context),'2026-12-31');
+const calendar=vm.runInContext("calendarMonths({from:'2026-10-30',to:'2026-11-02'})",context);
+assert.deepEqual(Array.from(calendar,month=>[month.month,Array.from(month.days)]),[
+  ['2026-10',['2026-10-30','2026-10-31']],['2026-11',['2026-11-01','2026-11-02']],
+]);
+assert.equal(vm.runInContext('activityLevel(0)',context),0);
+assert.equal(vm.runInContext('activityLevel(1)',context),1);
+assert.equal(vm.runInContext('activityLevel(8)',context),4);
+assert.equal(vm.runInContext("activityCountsByDay([{day:'2026-10-14'},{day:'2026-10-14'},{day:'2026-10-13'}]).get('2026-10-14')",context),2);
+assert.equal(vm.runInContext("toggleJournalDay('2026-10-14')",context),'2026-10-14');
+assert.equal(vm.runInContext("matchesJournalDay('2026-10-14')",context),true);
+assert.equal(vm.runInContext("matchesJournalDay('2026-10-13')",context),false);
+assert.equal(vm.runInContext("toggleJournalDay('2026-10-14')",context),null);
+assert.equal(vm.runInContext("matchesJournalDay('2026-10-13')",context),true);
 console.log(`Grouping checks passed: ${checked} orders/subsets`);

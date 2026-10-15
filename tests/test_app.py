@@ -85,10 +85,16 @@ class AppServerTests(unittest.TestCase):
             html = response.read().decode("utf-8")
             self.assertIn('id="settings-dialog"', html)
             self.assertIn('<select id="setting-timezone" required>', html)
-            self.assertIn('id="setting-timezone-search"', html)
+            self.assertIn('id="setting-timezone-country"', html)
+            self.assertIn('id="setting-timezone-preview"', html)
+            self.assertNotIn('id="setting-timezone-search"', html)
             self.assertIn('id="view-journal"', html)
             self.assertIn('id="range-dialog"', html)
-            for picker in ("feed-type", "feed-collection", "journal-category", "journal-collection"):
+            self.assertIn('id="activity-calendar"', html)
+            self.assertIn('id="journal-mode-feed"', html)
+            self.assertIn('id="journal-mode-annotations"', html)
+            self.assertNotIn('id="view-feed"', html)
+            for picker in ("feed-type", "journal-category", "journal-collection", "journal-tag"):
                 self.assertIn(f'<div id="{picker}"></div>', html)
                 self.assertNotIn(f'<select id="{picker}"', html)
         with self.request(f"/export?token={self.token}&from=2026-10-01&to=2026-10-14") as response:
@@ -142,6 +148,13 @@ class AppServerTests(unittest.TestCase):
 
 
 class ConfigPersistenceTests(unittest.TestCase):
+    def test_timezone_locations_keep_canonical_shanghai_name(self):
+        table = "# zone.tab\nCN\t+3114+12128\tAsia/Shanghai\nCN\t+4348+08735\tAsia/Urumqi\n"
+        with patch.object(app.Path, "read_text", return_value=table):
+            locations = app.timezone_locations(["Asia/Shanghai", "Asia/Urumqi", "UTC"])
+        self.assertIn({"country": "CN", "city": "Shanghai", "zone": "Asia/Shanghai"}, locations)
+        self.assertIn({"country": "", "city": "UTC", "zone": "UTC"}, locations)
+
     def test_unified_tag_migration_and_removed_reading_mapping(self):
         original = journal.load_config(journal.HERE / "config.json")
         migrated = journal.editable_tag_config(original)

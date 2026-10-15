@@ -25,6 +25,8 @@ let groupOrder = [...data.default_groupers,...allGroupers.filter(group=>!data.de
 let activeGroupers = new Set(data.default_groupers);
 let visibleRange = {...data.range};
 let visibleData;
+let journalMode='feed';
+let selectedJournalDay=null;
 let selectedSizeDate = data.range.to;
 let selectedSizeMonth = data.range.to.slice(0,7);
 function monthLastDay(month){const [year,number]=month.split('-').map(Number);return new Date(Date.UTC(year,number,0)).toISOString().slice(0,10);}
@@ -132,7 +134,7 @@ function deriveRangeView(source,range) {
   const annotationEvents=journal.map(entry=>({paper_key:entry.paper_key,paper_title:entry.paper_title,creators:entry.creators,
     status_group:entry.status_group,collections:entry.collections,collection_group:entry.collection_group,collection_keys:entry.collection_keys,
     resource_link:entry.resource_link,zotero_link:entry.zotero_link,paper_zotero_link:entry.paper_zotero_link,key:'annotation:'+entry.key,type:entry.event_type,at:entry.event_at,category:entry.category,
-    color:entry.color,tags:entry.paper_tags,annotation_tags:entry.tags}));
+    color:entry.color,tags:entry.paper_tags,annotation_tags:entry.tags,text:entry.text,comment:entry.comment,day:entry.periods?.day}));
   const activity=[...papersAdded,...annotationEvents].sort((a,b)=>b.at.localeCompare(a.at)||b.key.localeCompare(a.key));
   const activeKeys=new Set(activity.map(event=>event.paper_key)),addedPaperKeys=new Set(papersAdded.map(event=>event.paper_key));
   const annotatedPaperKeys=new Set(journal.map(entry=>entry.paper_key)),annotationCounts=new Map(),latestAnnotationAt=new Map();
@@ -145,7 +147,7 @@ function deriveRangeView(source,range) {
 }
 
 function activateView(name, scroll = true) {
-  for (const view of ['dashboard','feed','journal']) {
+  for (const view of ['dashboard','journal']) {
     $('view-'+view).hidden=view!==name;
     const button=document.querySelector(`[data-view="${view}"]`);
     if (view===name) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');
@@ -153,6 +155,47 @@ function activateView(name, scroll = true) {
   if (scroll) window.scrollTo({top:0,behavior:'smooth'});
 }
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>activateView(button.dataset.view)));
+function setJournalMode(mode){
+  journalMode=mode;
+  $('journal-mode-feed').setAttribute('aria-pressed',String(mode==='feed'));
+  $('journal-mode-annotations').setAttribute('aria-pressed',String(mode==='annotations'));
+  $('journal-feed-panel').hidden=mode!=='feed';$('journal-annotations-panel').hidden=mode!=='annotations';
+  $('feed-type-control').hidden=mode!=='feed';$('journal-category-control').hidden=mode!=='annotations';
+}
+$('journal-mode-feed').addEventListener('click',()=>setJournalMode('feed'));
+$('journal-mode-annotations').addEventListener('click',()=>setJournalMode('annotations'));
+function activityCountsByDay(events){
+  const counts=new Map();events.forEach(event=>{if(event.day)counts.set(event.day,(counts.get(event.day)||0)+1);});return counts;
+}
+function toggleJournalDay(day){selectedJournalDay=selectedJournalDay===day?null:day;return selectedJournalDay;}
+function matchesJournalDay(day){return !selectedJournalDay||selectedJournalDay===day;}
+function activityLevel(count){return count===0?0:count===1?1:count<=3?2:count<=7?3:4;}
+function calendarMonths(range){
+  const months=[];let month=range.from.slice(0,7);
+  while(month<=range.to.slice(0,7)){
+    const [year,number]=month.split('-').map(Number),first=month===range.from.slice(0,7)?Number(range.from.slice(-2)):1;
+    const last=month===range.to.slice(0,7)?Number(range.to.slice(-2)):new Date(Date.UTC(year,number,0)).getUTCDate();
+    months.push({month,leading:(new Date(Date.UTC(year,number-1,first)).getUTCDay()+6)%7,days:Array.from({length:last-first+1},(_,index)=>`${month}-${String(first+index).padStart(2,'0')}`)});
+    month=new Date(Date.UTC(year,number,1)).toISOString().slice(0,7);
+  }
+  return months;
+}
+function renderActivityCalendar(){
+  const host=$('activity-calendar'),counts=activityCountsByDay(visibleData.activity);host.replaceChildren();
+  const allCount=visibleData.activity.length,chosenCount=counts.get(selectedJournalDay)||0;
+  $('activity-day-label').textContent=selectedJournalDay?`${selectedJournalDay} · ${chosenCount} event${chosenCount===1?'':'s'} · click again to clear`:`${allCount} event${allCount===1?'':'s'} in range`;
+  calendarMonths(visibleRange).forEach(({month,leading,days})=>{
+    const section=el('section','activity-month'),heading=el('div','activity-month-title',monthName(month)),grid=el('div','activity-month-days');
+    grid.setAttribute('aria-label',monthName(month));
+    ['M','T','W','T','F','S','S'].forEach(day=>grid.append(el('span','activity-weekday',day)));
+    for(let index=0;index<leading;index++)grid.append(el('span','activity-blank'));
+    days.forEach(day=>{const count=counts.get(day)||0,button=el('button','activity-day',String(Number(day.slice(-2))));button.type='button';button.dataset.day=day;button.dataset.level=String(activityLevel(count));button.setAttribute('aria-pressed',String(selectedJournalDay===day));
+      button.setAttribute('aria-label',`${day}: ${count} event${count===1?'':'s'}${selectedJournalDay===day?', selected':''}`);
+      button.title=`${day} · ${count} event${count===1?'':'s'}`;
+      button.addEventListener('click',()=>{toggleJournalDay(day);renderActivityCalendar();renderFeed();renderJournal();const selected=host.querySelector(`[data-day="${day}"]`);if(selected)selected.focus({preventScroll:true});});grid.append(button);
+    });section.append(heading,grid);host.append(section);
+  });
+}
 
 function drawGrowth() {
   const host=$('growth-chart');host.replaceChildren();
@@ -279,8 +322,8 @@ function openCollection(keys) {
 }
 
 function renderFeed() {
-  const query=$('feed-search').value.toLocaleLowerCase();
-  const visible=visibleData.activity.filter(event=>matchesFilterSelection('feed-type',[event.type])&&matchesFilterSelection('feed-collection',event.collection_keys.length?event.collection_keys:['__unfiled__'])&&matchesFilterSelection('feed-tag',[...Object.values(event.tags).flat(),...(event.annotation_tags||[])])&&(!query||[event.paper_title,...event.creators,event.category||''].join(' ').toLocaleLowerCase().includes(query)));
+  const query=$('journal-search').value.trim().toLocaleLowerCase();
+  const visible=visibleData.activity.filter(event=>matchesJournalDay(event.day)&&matchesFilterSelection('feed-type',[event.type])&&matchesFilterSelection('journal-collection',event.collection_keys.length?event.collection_keys:['__unfiled__'])&&matchesFilterSelection('journal-tag',[...Object.values(event.tags).flat(),...(event.annotation_tags||[])])&&(!query||[event.paper_title,...event.creators,event.category||'',event.text||'',event.comment||''].join(' ').toLocaleLowerCase().includes(query)));
   $('feed-result').textContent=`${visible.length} of ${visibleData.activity.length} events visible`;const host=$('feed-list');host.replaceChildren();
   if(!visible.length){host.append(el('div','panel empty','No activity matches these filters.'));return;}
   const groups=new Map();visible.forEach(event=>{const key=event.collection_group;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(event);});
@@ -320,14 +363,14 @@ function annotationCard(entry) {
 function openJournalEntry(key){
   const findCard=()=>[...$('journal-list').querySelectorAll('.journal-entry')].find(node=>node.dataset.refreshKey===`annotation:${key}`);
   if(!findCard()){
-    $('journal-search').value='';for(const id of ['journal-category','journal-collection','journal-tag'])filterSelections.set(id,null);
+    selectedJournalDay=null;$('journal-search').value='';for(const id of ['journal-category','journal-collection','journal-tag'])filterSelections.set(id,null);
     refreshFilterOptions();
-    renderJournal();
+    renderActivityCalendar();renderFeed();renderJournal();
   }
   const card=findCard();
   if(!card)return;
   for(let parent=card.parentElement;parent;parent=parent.parentElement)if(parent.matches('details.journal-group'))parent.open=true;
-  activateView('journal',false);card.scrollIntoView({block:'center',behavior:'auto'});card.focus({preventScroll:true});
+  setJournalMode('annotations');activateView('journal',false);card.scrollIntoView({block:'center',behavior:'auto'});card.focus({preventScroll:true});
 }
 function groupValue(entry,dimension) {
   if(dimension==='paper')return [entry.paper_key,entry.paper_title];
@@ -371,8 +414,8 @@ function renderGroupers() {
   });
 }
 function renderJournal() {
-  const query=$('journal-search').value.toLocaleLowerCase();
-  const visible=visibleData.journal.filter(entry=>matchesFilterSelection('journal-category',[entry.category])&&matchesFilterSelection('journal-collection',entry.collection_keys.length?entry.collection_keys:['__unfiled__'])&&matchesFilterSelection('journal-tag',[...entry.tags,...Object.values(entry.paper_tags).flat()])&&(!query||[entry.paper_title,entry.text,entry.comment,...entry.creators].join(' ').toLocaleLowerCase().includes(query)));
+  const query=$('journal-search').value.trim().toLocaleLowerCase();
+  const visible=visibleData.journal.filter(entry=>matchesJournalDay(entry.periods?.day)&&matchesFilterSelection('journal-category',[entry.category])&&matchesFilterSelection('journal-collection',entry.collection_keys.length?entry.collection_keys:['__unfiled__'])&&matchesFilterSelection('journal-tag',[...entry.tags,...Object.values(entry.paper_tags).flat()])&&(!query||[entry.paper_title,entry.text,entry.comment,...entry.creators].join(' ').toLocaleLowerCase().includes(query)));
   $('journal-result').textContent=`${visible.length} of ${visibleData.journal.length} annotations visible`;const host=$('journal-list'),closed=new Set([...host.querySelectorAll('details.journal-group:not([open])')].map(node=>node.dataset.groupKey));host.replaceChildren();
   if(!visible.length){host.append(el('div','panel empty','No annotations match these filters.'));return;}
   const dimensions=groupOrder.filter(group=>activeGroupers.has(group));
@@ -395,19 +438,19 @@ function refreshFilterOptions() {
   const collectionNodes=data.collections.map(item=>({key:item.key,parent_key:item.parent_key,label:item.name}));
   if([...visibleData.inventory,...visibleData.journal].some(item=>!item.collection_keys.length))collectionNodes.push({key:'__unfiled__',parent_key:null,label:'Unfiled'});
   const collectionKeys=new Set(collectionNodes.map(node=>node.key)),collectionLabels={all:'All collections',singular:'collection',plural:'collections'};
-  renderFilterPicker('feed-collection',collectionNodes,collectionKeys,collectionLabels,renderFeed);
-  renderFilterPicker('journal-collection',collectionNodes,collectionKeys,collectionLabels,renderJournal);
+  const renderBoth=()=>{renderFeed();renderJournal();};
+  renderFilterPicker('journal-collection',collectionNodes,collectionKeys,collectionLabels,renderBoth);
   const eventNodes=[['Paper added','#486ca2'],['Annotation created','#17645d'],['Annotation updated','#976029']].map(([key,color])=>({key,label:key,parent_key:null,color}));
   renderFilterPicker('feed-type',eventNodes,new Set(eventNodes.map(node=>node.key)),{all:'All events',singular:'event',plural:'events'},renderFeed);
   renderTagFilter('inventory-tag',paperTags,renderInventory);
-  renderTagFilter('feed-tag',new Set([...paperTags,...annotationTags]),renderFeed);
-  renderTagFilter('journal-tag',new Set([...paperTags,...annotationTags]),renderJournal);
+  renderTagFilter('journal-tag',new Set([...paperTags,...annotationTags]),renderBoth);
   const categoryNodes=[...categories].sort((a,b)=>a.localeCompare(b)).map(key=>({key,label:key,parent_key:null,color:data.color_legend.find(entry=>entry.label===key)?.color}));
   renderFilterPicker('journal-category',categoryNodes,categories,{all:'All categories',singular:'category',plural:'categories'},renderJournal);
 }
 
 function renderVisibleRange() {
   visibleData=deriveRangeView(data,visibleRange);
+  if(selectedJournalDay&&!inRange(selectedJournalDay,visibleRange))selectedJournalDay=null;
   if(selectedSizeDate<visibleRange.from||selectedSizeDate>visibleRange.to)selectedSizeDate=visibleRange.to;
   if(selectedSizeMonth<visibleRange.from.slice(0,7)||selectedSizeMonth>visibleRange.to.slice(0,7))selectedSizeMonth=visibleRange.to.slice(0,7);
   $('growth-month').replaceChildren(...sizePoints(visibleRange,'month').map(point=>option(point.label,monthName(point.label))));
@@ -418,7 +461,7 @@ function renderVisibleRange() {
   $('stat-journal').textContent=visibleData.journal.length;
   renderSizeCharts();
   refreshFilterOptions();
-  renderStatusSummary();renderInventory();renderFeed();renderJournal();
+  renderStatusSummary();renderInventory();renderActivityCalendar();renderFeed();renderJournal();
 }
 function refreshPosition(){
   const active=document.querySelector('.view:not([hidden])'),top=$('site-header').getBoundingClientRect().bottom;
@@ -459,5 +502,4 @@ $('growth-resolution').addEventListener('change',()=>{if($('growth-resolution').
 $('growth-month').addEventListener('change',()=>{selectedSizeMonth=$('growth-month').value;renderSizeCharts();});
 $('growth-date').addEventListener('change',()=>{const chosen=$('growth-date').value;if(chosen<visibleRange.from||chosen>visibleRange.to)return;selectedSizeDate=chosen;renderSizeCharts();});
 ['inventory-search','inventory-filter','inventory-sort'].forEach(id=>$(id).addEventListener(id==='inventory-search'?'input':'change',renderInventory));
-$('feed-search').addEventListener('input',renderFeed);
-$('journal-search').addEventListener('input',renderJournal);
+$('journal-search').addEventListener('input',()=>{renderFeed();renderJournal();});

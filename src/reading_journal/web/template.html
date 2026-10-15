@@ -59,13 +59,35 @@
     .swatch { flex: 0 0 16px; height: 16px; margin-top: 2px; border-radius: 4px; background: var(--swatch,#aab3af); }
     .section-space { margin-top: 19px; }
     .controls { display: grid; grid-template-columns: minmax(160px,1.5fr) repeat(3,minmax(130px,1fr)); gap: 10px; margin: 12px 0 10px; }
+    .journal-modes { display: inline-flex; gap: 4px; padding: 4px; background: #e7eee8; border-radius: 10px; margin-bottom: 16px; }
+    .journal-modes button { min-height: var(--control-height); padding: 0 15px; border: 0; border-radius: 7px; background: transparent; color: #426257; font-size: .87rem; font-weight: 700; }
+    .journal-modes button[aria-pressed="true"] { background: #fff; color: #174e42; box-shadow: 0 1px 5px #173d3922; }
+    #feed-type-control[hidden],#journal-category-control[hidden],#journal-feed-panel[hidden],#journal-annotations-panel[hidden] { display: none; }
+    .activity-monitor { padding: 17px 20px; }
+    .activity-monitor-head { display: flex; justify-content: space-between; align-items: start; gap: 14px; }
+    .activity-monitor-head h2 { margin-bottom: 3px; }
+    .activity-monitor-head .help { margin-bottom: 0; }
+    .activity-calendar { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 15px; margin-top: 14px; }
+    .activity-month-title { color: #315a4d; font-size: .81rem; font-weight: 700; margin-bottom: 5px; }
+    .activity-month-days { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; }
+    .activity-weekday { text-align: center; color: #718078; font-size: .67rem; }
+    .activity-day { display: block; width: 100%; height: 25px; border: 0; border-radius: 5px; background: #e8eee9; color: #365347; font-size: .68rem; font-variant-numeric: tabular-nums; }
+    .activity-day[data-level="1"],.activity-legend i[data-level="1"] { background: #c6e0d2; }
+    .activity-day[data-level="2"],.activity-legend i[data-level="2"] { background: #8ec8ae; color: #173d39; }
+    .activity-day[data-level="3"],.activity-legend i[data-level="3"] { background: #54a385; color: #fff; }
+    .activity-day[data-level="4"],.activity-legend i[data-level="4"] { background: #21775e; color: #fff; }
+    .activity-day[aria-pressed="true"] { outline: 2px solid #173d39; outline-offset: 1px; }
+    .activity-day:focus-visible { outline: 3px solid #9fddc4; outline-offset: 1px; }
+    .activity-blank { min-height: 25px; }
+    .activity-legend { display: flex; align-items: center; gap: 4px; margin-top: 12px; }
+    .activity-legend i { width: 13px; height: 13px; border-radius: 3px; background: #e8eee9; }
     .controls label,.field-label { display: block; color: #53615e; font-size: .76rem; font-weight: 700; }
     .controls input,.controls select,.settings-grid input:not([type="checkbox"]),.settings-grid select,.settings-grid textarea { width: 100%; border: 1px solid #ccd8d2; border-radius: var(--control-radius); padding: 0 10px; background: white; color: #20312d; margin-top: 5px; }
     .controls input,.controls select,.settings-grid input:not([type="checkbox"]),.settings-grid select { height: var(--control-height); }
     .controls select,.chart-controls select,.settings-grid select,.editor-grid select { -webkit-appearance: none; appearance: none; display: block; height: var(--control-height); min-height: var(--control-height); line-height: normal; padding: 0 34px 0 10px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23536b61' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; background-size: 12px 8px; }
     .settings-grid input[type="color"] { padding: 4px; }
     .settings-grid textarea { min-height: 90px; padding-block: 8px; resize: vertical; }
-    .timezone-setting .small { display: block; margin-top: 4px; font-weight: 400; }
+    .timezone-preview { grid-column: 1 / -1; margin: -3px 0 0; color: #65776f; }
     .controls :focus-visible,.settings-grid :focus-visible,button:focus-visible { outline: 3px solid #9fddc4; outline-offset: 1px; }
     .result-line { display: inline-block; min-width: 27ch; margin: 8px 0 14px; font-variant-numeric: tabular-nums; }
     .status-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
@@ -246,8 +268,7 @@
     <div class="brand"><strong>Reading Journal</strong><button id="range-label" class="range-toggle" type="button" aria-label="Filter report by date range"></button></div>
     <nav class="site-nav" aria-label="Pages">
       <button type="button" data-view="dashboard" aria-current="page">Dashboard</button>
-      <button type="button" data-view="feed">Activity Feed</button>
-      <button type="button" data-view="journal">Journal Entries</button>
+      <button type="button" data-view="journal">Journal</button>
     </nav>
     __APP_CONTROLS__
   </div></header>
@@ -290,27 +311,33 @@
         <div id="collection-tree"></div>
       </section>
     </section>
-    <section id="view-feed" class="view" aria-labelledby="feed-heading" hidden>
-      <div class="page-head"><div><h1 id="feed-heading">Activity Feed</h1><p class="help">Edits within 20 minutes of creating an annotation count as creation. Later changes appear as updates; Zotero does not identify which field changed.</p></div></div>
-      <div class="controls">
-        <label>Search<input id="feed-search" type="search" placeholder="Paper or author"></label>
-        <div class="field-label">Event<div id="feed-type"></div></div>
-        <div class="field-label">Collection<div id="feed-collection"></div></div>
-        <div class="field-label">Tags<div id="feed-tag"></div></div>
-      </div>
-      <div id="feed-result" class="result-line" aria-live="polite"></div><div id="feed-list"></div>
-    </section>
     <section id="view-journal" class="view" aria-labelledby="journal-heading" hidden>
-      <div class="page-head"><h1 id="journal-heading">Journal Entries</h1></div>
+      <div class="page-head"><h1 id="journal-heading">Journal</h1></div>
+      <div class="journal-modes" role="group" aria-label="Journal view">
+        <button id="journal-mode-feed" type="button" aria-pressed="true">Feed</button>
+        <button id="journal-mode-annotations" type="button" aria-pressed="false">Annotations</button>
+      </div>
+      <section class="activity-monitor panel" aria-labelledby="activity-monitor-heading">
+        <div class="activity-monitor-head"><div><h2 id="activity-monitor-heading">Activity</h2><p class="help">In the selected report range · click a day again to show all days</p></div><span id="activity-day-label" class="small" aria-live="polite"></span></div>
+        <div id="activity-calendar" class="activity-calendar" aria-label="Activity by day"></div>
+        <div class="activity-legend small"><span>Less</span><i data-level="0"></i><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><span>More</span></div>
+      </section>
       <div class="controls">
-        <label>Search<input id="journal-search" type="search" placeholder="Paper, passage, comment"></label>
-        <div class="field-label">Annotation category<div id="journal-category"></div></div>
+        <label>Search<input id="journal-search" type="search" placeholder="Paper, passage, comment, or author"></label>
         <div class="field-label">Collection<div id="journal-collection"></div></div>
         <div class="field-label">Tags<div id="journal-tag"></div></div>
+        <div id="feed-type-control" class="field-label">Event<div id="feed-type"></div></div>
+        <div id="journal-category-control" class="field-label" hidden>Annotation category<div id="journal-category"></div></div>
       </div>
-      <div class="small">Group by · click to toggle, drag or use arrows to reorder · weeks run Monday–Sunday</div>
-      <div id="groupers" class="groupers" aria-label="Journal grouping order"></div>
-      <div id="journal-result" class="result-line" aria-live="polite"></div><div id="journal-list"></div>
+      <div id="journal-feed-panel">
+        <p class="help">Edits within 20 minutes of creating an annotation count as creation. Later changes appear as updates; Zotero does not identify which field changed.</p>
+        <div id="feed-result" class="result-line" aria-live="polite"></div><div id="feed-list"></div>
+      </div>
+      <div id="journal-annotations-panel" hidden>
+        <div class="small">Group by · click to toggle, drag or use arrows to reorder · weeks run Monday–Sunday</div>
+        <div id="groupers" class="groupers" aria-label="Journal grouping order"></div>
+        <div id="journal-result" class="result-line" aria-live="polite"></div><div id="journal-list"></div>
+      </div>
     </section>
   </main>
   <script>

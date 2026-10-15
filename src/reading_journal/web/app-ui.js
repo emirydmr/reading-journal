@@ -80,24 +80,35 @@ if (appConfig) {
   function fillCollectionTree() {
     renderChoiceTree($('setting-collections'),appCatalog.collections.map(item=>({...item,label:item.name})),new Set(appCatalog.selected_collections||[]));
   }
-  function renderTimezones(query,selected) {
-    const select=$('setting-timezone'),names=appCatalog.timezones||[selected];
-    const needle=query.trim().toLocaleLowerCase();
-    const matches=names.filter(name=>name.replaceAll('_',' ').toLocaleLowerCase().includes(needle)||name.toLocaleLowerCase().includes(needle));
-    const displayed=[...new Set([...matches,selected])].sort((a,b)=>a.localeCompare(b));
-    select.replaceChildren();
-    const groups=new Map();
-    displayed.forEach(name=>{const region=name.includes('/')?name.split('/')[0]:'Other';
-      if(!groups.has(region)){const group=el('optgroup');group.label=region;groups.set(region,group);select.append(group);}
-      groups.get(region).append(option(name,name));
-    });
-    select.value=selected;
-    $('setting-timezone-count').textContent=`${matches.length} matching timezone${matches.length===1?'':'s'}`;
+  const timezoneLocations=appCatalog.timezone_locations||[];
+  const regionNames=typeof Intl.DisplayNames==='function'?new Intl.DisplayNames([navigator.language||'en'],{type:'region'}):null;
+  const countryName=code=>code?(regionNames?.of(code)||code):'Other timezones';
+  function previewTimezone(){
+    const zone=$('setting-timezone').value,preview=$('setting-timezone-preview');
+    if(!zone){preview.textContent='';return;}
+    const now=new Date();
+    try{
+      const clock=new Intl.DateTimeFormat(navigator.language||'en',{timeZone:zone,hour:'numeric',minute:'2-digit',timeZoneName:'long'});
+      preview.textContent=`Local time: ${clock.format(now)} · Stored as ${zone}${zone==='Asia/Shanghai'?' · Also used in Beijing':''}`;
+    }catch(_error){preview.textContent=`Stored as ${zone}`;}
+  }
+  function renderTimezoneCities(country,selected){
+    const select=$('setting-timezone');select.replaceChildren();
+    timezoneLocations.filter(place=>place.country===country).sort((a,b)=>a.city.localeCompare(b.city,undefined,{numeric:true})).forEach(place=>select.append(option(place.zone,place.city)));
+    if(selected&&[...select.options].some(item=>item.value===selected))select.value=selected;
+    previewTimezone();
+  }
+  function fillTimezones(selected){
+    const countries=[...new Set(timezoneLocations.map(place=>place.country))].sort((a,b)=>countryName(a).localeCompare(countryName(b)));
+    const picker=$('setting-timezone-country');picker.replaceChildren();countries.forEach(code=>picker.append(option(code,countryName(code))));
+    const place=timezoneLocations.find(item=>item.zone===selected);
+    picker.value=place?.country??'';
+    renderTimezoneCities(picker.value,selected);
   }
   function fillSettings() {
     $('settings-error').textContent='';$('setting-from').value=data.range.from;$('setting-to').value=data.range.to;
     $('settings-diagnostics').textContent=(appCatalog.diagnostics||[]).join(' · ');
-    $('setting-timezone-search').value='';renderTimezones('',appConfig.timezone||'Asia/Shanghai');$('setting-window').value=appConfig.default_window_days||30;
+    fillTimezones(appConfig.timezone||'Asia/Shanghai');$('setting-window').value=appConfig.default_window_days||30;
     $('setting-unfiled').checked=Boolean(appConfig.include_unfiled);
     fillCollectionTree();
     const types=$('setting-types');types.replaceChildren();
@@ -106,7 +117,8 @@ if (appConfig) {
     $('setting-categories').replaceChildren();Object.entries(appCatalog.tag_categories||{}).forEach(([name,rule])=>categoryRow(name,rule));
   }
   $('app-settings').addEventListener('click',()=>{fillSettings();dialog.showModal();});
-  $('setting-timezone-search').addEventListener('input',()=>renderTimezones($('setting-timezone-search').value,$('setting-timezone').value));
+  $('setting-timezone-country').addEventListener('change',()=>renderTimezoneCities($('setting-timezone-country').value));
+  $('setting-timezone').addEventListener('change',previewTimezone);
   const saveGrouping=el('button','secondary','Save grouping as default');saveGrouping.type='button';$('groupers').after(saveGrouping);
   saveGrouping.addEventListener('click',async()=>{
     const next=JSON.parse(JSON.stringify(appConfig));next.default_groupers=groupOrder.filter(group=>activeGroupers.has(group));
