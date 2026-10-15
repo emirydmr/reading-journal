@@ -20,6 +20,8 @@ vm.runInContext(setup, context);
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Unassigned',revisit:false}})",context),true);
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Unassigned',revisit:true}})",context),false);
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Read',revisit:true}})",context),false);
+context.pageEntries=[{page:'10',key:'a'},{page:'2',key:'b'},{page:'2',key:'c'}];
+assert.deepEqual(Array.from(vm.runInContext('paperPageGroups(pageEntries)',context),group=>[group[0],group[1].length]),[['2',2],['10',1]]);
 context.rows = [
   {key:'A',status_group:'Read',paper_key:'P1',paper_title:'Paper 1',category:'Important',collection_group:'02 + 04',periods:{day:'2026-10-14',week:'2026-W42',month:'2026-10'}},
   {key:'B',status_group:'Read',paper_key:'P1',paper_title:'Paper 1',category:'Question',collection_group:'02 + 04',periods:{day:'2026-10-15',week:'2026-W42',month:'2026-10'}},

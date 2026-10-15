@@ -8,7 +8,7 @@ const el = (tag, className = '', value) => {
 const option = (value, label) => { const node = el('option', '', label); node.value = value; return node; };
 const fmt = iso => { if(!iso)return 'Unknown date'; try {return new Intl.DateTimeFormat('en-GB', {dateStyle:'medium', timeStyle:'short', timeZone:data.timezone}).format(new Date(iso));} catch {return 'Unknown date';} };
 const validColor = value => /^#[0-9a-f]{6}$/i.test(value || '');
-const paperLink = (title, url) => { const node = el(url ? 'a' : 'span', 'paper-title', title); if (url) {node.href=url;node.target='_blank';node.rel='noopener noreferrer';} return node; };
+const paperOverviewTitle = (title,key) => {const button=el('button','paper-title',title);button.type='button';button.title='Open paper overview';button.addEventListener('click',()=>openPaperOverview(key));return button;};
 const zoteroButton = (url,label='Open in Zotero',caption='Zotero') => {if(!appConfig||!url)return null;const link=el('a','zotero-button',caption);link.href=url;link.title=label;link.setAttribute('aria-label',label);return link;};
 function eventAction(url,label,kind){
   if(!appConfig||!url)return null;
@@ -27,6 +27,8 @@ let visibleRange = {...data.range};
 let visibleData;
 let journalMode='feed';
 let selectedJournalDay=null;
+let paperOverviewKey=null;
+let paperOverviewPage=null;
 let selectedSizeDate = data.range.to;
 let selectedSizeMonth = data.range.to.slice(0,7);
 function monthLastDay(month){const [year,number]=month.split('-').map(Number);return new Date(Date.UTC(year,number,0)).toISOString().slice(0,10);}
@@ -262,9 +264,36 @@ function statusPaint(paper) {
 function paperRow(paper) {
   const row=el('div','paper-row'),paint=statusPaint(paper);row.dataset.refreshKey=`paper:${paper.key}`;row.style.setProperty('--status-color',paint[0]);row.style.setProperty('--status-bg',paint[1]);
   const count=visibleData.annotationCounts.get(paper.key)||0;
-  const main=el('div');main.append(paperLink(paper.title,paper.resource_link));const open=zoteroButton(paper.zotero_link,`Open ${paper.title} in Zotero`);if(open)main.append(open);main.append(el('span','paper-meta',`${paper.creators.slice(0,2).join(', ')||'Unknown author'} · added ${fmt(paper.date_added)} · ${count} annotation${count===1?'':'s'} in range`));
-  const tags=el('div','status-tags'),names=[...new Set(Object.values(paper.tags).flat())];if(appConfig){(names.length?names:['No tags']).forEach(name=>{const trigger=el('button','status-tag tag-chip',name);trigger.type='button';trigger.title='Edit paper tags';const style=data.tag_styles?.[name];if(style){trigger.style.setProperty('--category-color',style.category_color);trigger.style.setProperty('--tag-color',style.color);trigger.style.setProperty('--tag-bg',style.color+'18');}trigger.addEventListener('click',()=>window.openPaperTagEditor(paper.key,paper.title));tags.append(trigger);});}else if(names.length)names.forEach(tag=>tags.append(tagChip(tag)));else tags.append(el('span','status-tag','No tags'));row.append(main,tags);return row;
+  const main=el('div');main.append(paperOverviewTitle(paper.title,paper.key));const open=zoteroButton(paper.zotero_link,`Open ${paper.title} in Zotero`);if(open)main.append(open);main.append(el('span','paper-meta',`${paper.creators.slice(0,2).join(', ')||'Unknown author'} · added ${fmt(paper.date_added)} · ${count} annotation${count===1?'':'s'} in range`));
+  const tags=el('div','status-tags'),names=[...new Set(Object.values(paper.tags).flat())];if(appConfig){(names.length?names:['No tags']).forEach(name=>{const trigger=el('button','status-tag tag-chip',name);trigger.type='button';trigger.title='Edit paper tags';const style=data.tag_styles?.[name];if(style){trigger.style.setProperty('--category-color',style.category_color);trigger.style.setProperty('--tag-color',style.color);trigger.style.setProperty('--tag-bg',style.color+'18');}trigger.addEventListener('click',()=>window.openPaperTagEditor(paper.key,paper.title));tags.append(trigger);});}else if(names.length)names.forEach(tag=>tags.append(tagChip(tag)));else tags.append(el('span','status-tag','No tags'));row.append(main,tags);row.addEventListener('click',event=>{if(!event.target.closest('button,a'))openPaperOverview(paper.key);});return row;
 }
+function paperPageOrder(a,b){const x=Number.parseFloat(a),y=Number.parseFloat(b);if(Number.isFinite(x)!==Number.isFinite(y))return Number.isFinite(x)?-1:1;return Number.isFinite(x)?x-y||a.localeCompare(b):a.localeCompare(b,undefined,{numeric:true});}
+function paperPageGroups(entries){const pages=new Map();entries.forEach(entry=>{const page=String(entry.page||'?');if(!pages.has(page))pages.set(page,[]);pages.get(page).push(entry);});return [...pages].sort((a,b)=>paperPageOrder(a[0],b[0]));}
+function overviewLink(label,url){const node=el(url?'a':'span','',`${label}${url?'':' · unavailable'}`);if(url){node.href=url;node.target='_blank';node.rel='noopener noreferrer';}return node;}
+function renderPaperOverview(){
+  const host=$('paper-overview-content');host.replaceChildren();
+  const paper=data.inventory.find(item=>item.key===paperOverviewKey);
+  if(!paper){host.append(el('p','help','This paper is no longer in the report.'));return;}
+  const entries=visibleData.journal.filter(entry=>entry.paper_key===paper.key);
+  const head=el('div','paper-overview-head'),copy=el('div');copy.append(el('h2','',paper.title),el('p','paper-meta',`${paper.creators.join(', ')||'Unknown author'} · added ${fmt(paper.date_added)} · ${paper.status_group}`));head.append(copy);host.append(head);
+  host.append(el('p','help',paper.collections.join(' · ')));
+  const actions=el('div','paper-overview-actions');actions.append(overviewLink('Open in Zotero',appConfig?paper.zotero_link:''),overviewLink('DOI',paper.doi_link),overviewLink('Website',paper.url_link));host.append(actions);
+  const tags=el('section','paper-overview-section');tags.append(el('h3','','Tags'));const tagList=el('div','status-tags');tagList.style.justifyContent='flex-start';const names=[...new Set(Object.values(paper.tags).flat())];if(names.length)names.forEach(name=>tagList.append(tagChip(name)));else tagList.append(el('span','small','No tags'));tags.append(tagList);host.append(tags);
+  if(paper.abstract){const section=el('section','paper-overview-section');section.append(el('h3','','Abstract'),el('p','paper-overview-abstract',paper.abstract));host.append(section);}
+  else if(appConfig&&!appConfig.include_abstracts){const section=el('section','paper-overview-section');section.append(el('h3','','Abstract'),el('p','small','Not included. Enable abstracts in Settings to show them here and in exports.'));host.append(section);}
+  const section=el('section','paper-overview-section');section.append(el('h3','','Annotations by page'),el('p','help',`${entries.length} annotation${entries.length===1?'':'s'} in the selected report range · select a page to inspect its annotations.`));host.append(section);
+  const categoryCounts=new Map();entries.forEach(entry=>{const key=entry.category+'\u0000'+entry.color;categoryCounts.set(key,(categoryCounts.get(key)||0)+1);});
+  if(categoryCounts.size){const summary=el('div','paper-color-summary');[...categoryCounts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).forEach(([key,count])=>{const [label,color]=key.split('\u0000'),badge=el('span','badge event-category',`${label} · ${count}`);if(validColor(color))badge.style.setProperty('--annotation-color',color);summary.append(badge);});section.append(summary);}
+  const groups=paperPageGroups(entries),grid=el('div','paper-page-grid');section.append(grid);
+  if(!groups.length){section.append(el('p','small','No annotations for this paper in the selected range.'));paperOverviewPage=null;return;}
+  if(!groups.some(([page])=>page===paperOverviewPage))paperOverviewPage=groups[0][0];
+  const maxCount=Math.max(...groups.map(([,items])=>items.length));
+  groups.forEach(([page,items])=>{const button=el('button','paper-page');button.type='button';button.setAttribute('aria-pressed',String(page===paperOverviewPage));button.setAttribute('aria-label',`Page ${page}, ${items.length} annotations`);button.append(el('span','paper-page-label',`Page ${page}`));const bar=el('span','paper-page-bar');bar.style.width=`${Math.max(20,100*items.length/maxCount)}%`;items.forEach(entry=>{const segment=el('i');segment.style.flex='1';if(validColor(entry.color))segment.style.setProperty('--segment-color',entry.color);segment.title=entry.category;bar.append(segment);});button.append(bar,el('span','paper-page-count',`${items.length} annotation${items.length===1?'':'s'}`));button.addEventListener('click',()=>{const scroll=host.scrollTop;paperOverviewPage=page;renderPaperOverview();host.scrollTop=scroll;});grid.append(button);});
+  const selected=groups.find(([page])=>page===paperOverviewPage)[1],list=el('div','paper-overview-list');section.append(el('h3','',`Page ${paperOverviewPage}`),list);
+  selected.forEach(entry=>{const card=el('article','journal-entry');if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);const top=el('div','journal-top'),heading=el('div');heading.append(el('strong','',entry.category),el('span','paper-meta',`${entry.event_type} · ${fmt(entry.event_at)}`));const actions=el('div','event-actions');const open=eventAction(entry.zotero_link,'Open annotation in Zotero’s PDF reader','annotation');if(open)actions.append(open);top.append(heading,actions);card.append(top);if(entry.text)card.append(el('div','paper-meta','Highlighted source text'),el('blockquote','',entry.text));if(entry.comment)card.append(el('div','paper-meta','Annotation comment'),el('p','comment',entry.comment));list.append(card);});
+}
+function openPaperOverview(key){paperOverviewKey=key;paperOverviewPage=null;renderPaperOverview();$('paper-overview-dialog').showModal();}
+$('paper-overview-close').addEventListener('click',()=>$('paper-overview-dialog').close());
 function renderStatusSummary() {
   const host=$('status-summary');host.replaceChildren();
   const roles=data.status_roles;
@@ -333,7 +362,7 @@ function renderFeed() {
     const list=el('div','panel');events.forEach(event=>{
       const row=el('div','event-row'),time=el('div','event-time',fmt(event.at)),main=el('div','event-main');row.dataset.refreshKey=`event:${event.key}`;
       const kind=el('strong','event-kind',event.type);kind.dataset.type=event.type;
-      const subject=el('div','event-subject');subject.append(paperLink(event.paper_title,event.resource_link));main.append(kind,subject);
+      const subject=el('div','event-subject');subject.append(paperOverviewTitle(event.paper_title,event.paper_key));main.append(kind,subject);
       if(event.category){const category=el('span','badge event-category',event.category);if(validColor(event.color))category.style.setProperty('--annotation-color',event.color);main.append(category);}
       const side=el('div','event-side'),state=el('span','small',`Now: ${event.status_group}`),actions=el('div','event-actions');
       if(event.type!=='Paper added'){
@@ -349,7 +378,7 @@ function renderFeed() {
 function annotationCard(entry) {
   const card=el('article','journal-entry');card.dataset.refreshKey=`annotation:${entry.key}`;card.tabIndex=-1;if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);
   const top=el('div','journal-top'),heading=el('div','journal-heading'),category=el('span','badge event-category',entry.category),actions=el('div','event-actions journal-actions');
-  heading.append(paperLink(entry.paper_title,entry.resource_link));if(validColor(entry.color))category.style.setProperty('--annotation-color',entry.color);
+  heading.append(paperOverviewTitle(entry.paper_title,entry.paper_key));if(validColor(entry.color))category.style.setProperty('--annotation-color',entry.color);
   const categoryLine=el('div');categoryLine.append(category);heading.append(categoryLine);
   const annotationOpen=eventAction(entry.zotero_link,'Open annotation in Zotero’s PDF reader','annotation');if(annotationOpen)actions.append(annotationOpen);
   const paperOpen=eventAction(entry.paper_zotero_link,'Open paper in Zotero','paper');if(paperOpen)actions.append(paperOpen);
@@ -462,6 +491,7 @@ function renderVisibleRange() {
   renderSizeCharts();
   refreshFilterOptions();
   renderStatusSummary();renderInventory();renderActivityCalendar();renderFeed();renderJournal();
+  if($('paper-overview-dialog').open)renderPaperOverview();
 }
 function refreshPosition(){
   const active=document.querySelector('.view:not([hidden])'),top=$('site-header').getBoundingClientRect().bottom;

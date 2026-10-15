@@ -174,17 +174,23 @@ def validate_config(raw: dict) -> dict:
     ZoneInfo(config.get("timezone", "Asia/Shanghai"))
     if int(config.get("default_window_days", 30)) < 1:
         raise ValueError("Default window must be at least one day")
+    if not isinstance(config.get("include_abstracts", False), bool):
+        raise ValueError("Include abstracts must be on or off")
     return config
 
 
 def external_paper_link(paper: dict) -> str:
+    doi_link, url_link = paper_links(paper)
+    return doi_link or url_link
+
+
+def paper_links(paper: dict) -> tuple[str, str]:
     doi = (paper.get("DOI") or "").strip()
     doi = re.sub(r"^(?:doi:|https?://(?:dx\.)?doi\.org/)", "", doi, flags=re.I).strip()
-    if re.fullmatch(r"10\.\d{4,9}/\S+", doi, flags=re.I):
-        return "https://doi.org/" + urllib.parse.quote(doi, safe="/.-_()")
+    doi_link = "https://doi.org/" + urllib.parse.quote(doi, safe="/.-_()") if re.fullmatch(r"10\.\d{4,9}/\S+", doi, flags=re.I) else ""
     url = (paper.get("url") or "").strip()
     parsed = urllib.parse.urlparse(url)
-    return url if parsed.scheme in ("http", "https") and parsed.netloc else ""
+    return doi_link, url if parsed.scheme in ("http", "https") and parsed.netloc else ""
 
 
 def zotero_paper_link(key: str) -> str:
@@ -497,6 +503,7 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
         memberships = [paths[key] for key in membership_keys]
         creators = [" ".join(part for part in (c.get("firstName"), c.get("lastName") or c.get("name")) if part) for c in paper.get("creators") or []]
         resource_link = external_paper_link(paper)
+        doi_link, url_link = paper_links(paper)
         if len(memberships) > 1:
             collection_group = " + ".join(re.match(r"\d+", path.split(" / ")[-1]).group() if re.match(r"\d+", path.split(" / ")[-1]) else path.split(" / ")[-1] for path in memberships)
         else:
@@ -519,6 +526,9 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
             "new_in_period": newly_added,
             "annotated_in_period": bool(recent_annotations),
             "resource_link": resource_link,
+            "doi_link": doi_link,
+            "url_link": url_link,
+            "abstract": (paper.get("abstractNote") or "") if config.get("include_abstracts", False) else "",
             "zotero_link": zotero_paper_link(paper["key"]),
         })
         common = {

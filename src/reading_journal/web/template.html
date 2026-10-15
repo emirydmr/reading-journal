@@ -102,7 +102,27 @@
     .collection-node.single-root > summary { display: none; }
     .collection-node.single-root > .collection-body { padding: 0; }
     .paper-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; border-left: 5px solid var(--status-color,#a7b3ae); background: var(--status-bg,#f8f9f7); border-radius: 0 8px 8px 0; margin: 6px 0; padding: 8px 11px; }
+    .paper-row:hover { filter: brightness(.985); cursor: pointer; }
     .paper-title { display: inline-block; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+    button.paper-title { border: 0; background: transparent; color: #17645d; text-align: left; text-decoration: underline; cursor: pointer; padding: 0; font: inherit; font-weight: 700; }
+    .paper-overview-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+    .paper-overview-head h2 { margin: 0 0 6px; line-height: 1.25; }
+    .paper-overview-section { margin-top: 20px; padding-top: 18px; border-top: 1px solid #dfe7df; }
+    .paper-overview-section h3 { margin-bottom: 10px; }
+    .paper-overview-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+    .paper-overview-actions a,.paper-overview-actions span { display: inline-flex; align-items: center; min-height: 36px; padding: 5px 11px; border: 1px solid #b9cfc2; border-radius: 8px; background: white; color: #17645d; font-size: .78rem; font-weight: 700; text-decoration: none; }
+    .paper-overview-actions span { color: #8a9690; border-color: #e0e6e0; background: #f6f8f5; }
+    .paper-overview-actions a:hover { background: #eaf4ed; }
+    .paper-overview-abstract { white-space: pre-wrap; line-height: 1.5; }
+    .paper-page-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(110px,1fr)); gap: 9px; }
+    .paper-page { min-width: 0; border: 1px solid #d6e2d8; border-radius: 9px; background: #f8faf7; padding: 9px; color: #294b40; text-align: left; cursor: pointer; }
+    .paper-page[aria-pressed="true"] { border-color: #1e7464; box-shadow: inset 0 0 0 1px #1e7464; background: #eef7f0; }
+    .paper-page-label { display: block; margin-bottom: 8px; font-size: .8rem; font-weight: 700; }
+    .paper-page-bar { display: flex; height: 32px; overflow: hidden; border-radius: 5px; background: #e9eeea; }
+    .paper-page-bar i { display: block; min-width: 3px; background: var(--segment-color,#aab3af); }
+    .paper-page-count { display: block; margin-top: 7px; font-size: .72rem; color: #66736d; }
+    .paper-color-summary { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 15px; }
+    .paper-overview-list .journal-entry { margin: 10px 0; }
     .paper-meta { display: block; color: #66736d; font-size: .76rem; margin-top: 2px; }
     .status-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
     .status-tag,.badge { display: inline-block; background: white; border: 1px solid #d7e0d9; border-radius: 100px; padding: 2px 8px; color: #3c5149; font-size: .72rem; white-space: nowrap; }
@@ -194,6 +214,10 @@
     #paper-tag-dialog[open] { display: flex; flex-direction: column; }
     #paper-tag-dialog .settings-head { position: static; flex: 0 0 auto; }
     #paper-tag-dialog .settings-content { flex: 1; min-height: 0; max-height: none; overflow-y: auto; }
+    #paper-overview-dialog { width: min(980px,95vw); height: min(900px,92vh); max-height: 92vh; overflow: hidden; }
+    #paper-overview-dialog[open] { display: flex; flex-direction: column; }
+    #paper-overview-dialog .settings-head { position: static; flex: 0 0 auto; }
+    #paper-overview-dialog .settings-content { flex: 1; min-height: 0; max-height: none; overflow-y: auto; }
     .settings-footer { flex: 0 0 auto; padding: 12px 22px; background: white; border-top: 1px solid #dfe7df; }
     .settings-footer .settings-actions { margin: 0; }
     .settings-footer .error:not(:empty) { margin-bottom: 8px; }
@@ -284,6 +308,10 @@
   <dialog id="paper-tag-dialog" aria-labelledby="paper-tag-heading">
     <div class="settings-head"><h2 id="paper-tag-heading">Paper tags</h2><button id="paper-tag-close" class="secondary" type="button">Close</button></div>
     <div class="settings-content"><p id="paper-tag-title" class="help"></p><div id="paper-tag-categories" class="tag-editor-categories"></div><p id="paper-tag-error" class="error" role="alert"></p><div class="settings-actions"><button id="paper-tag-cancel" class="secondary" type="button">Cancel</button><button id="paper-tag-save" class="primary" type="button">Save tags to Zotero</button></div></div>
+  </dialog>
+  <dialog id="paper-overview-dialog" aria-labelledby="paper-overview-label">
+    <div class="settings-head"><h2 id="paper-overview-label">Paper overview</h2><button id="paper-overview-close" class="secondary" type="button">Close</button></div>
+    <div id="paper-overview-content" class="settings-content"></div>
   </dialog>
   <main class="wrap">
     <section id="view-dashboard" class="view" aria-labelledby="dashboard-heading">

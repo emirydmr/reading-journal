@@ -109,7 +109,7 @@ if (appConfig) {
     $('settings-error').textContent='';$('setting-from').value=data.range.from;$('setting-to').value=data.range.to;
     $('settings-diagnostics').textContent=(appCatalog.diagnostics||[]).join(' · ');
     fillTimezones(appConfig.timezone||'Asia/Shanghai');$('setting-window').value=appConfig.default_window_days||30;
-    $('setting-unfiled').checked=Boolean(appConfig.include_unfiled);
+    $('setting-unfiled').checked=Boolean(appConfig.include_unfiled);$('setting-abstracts').checked=Boolean(appConfig.include_abstracts);
     fillCollectionTree();
     const types=$('setting-types');types.replaceChildren();
     appCatalog.paper_types.forEach(name=>checkbox(types,name,name.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,letter=>letter.toUpperCase()),(appConfig.paper_types||[]).includes(name)));
@@ -151,7 +151,7 @@ if (appConfig) {
   $('settings-save').addEventListener('click',async()=>{
     const next=JSON.parse(JSON.stringify(appConfig));
     next.timezone=$('setting-timezone').value.trim();next.default_window_days=Number($('setting-window').value);
-    next.include_descendants=false;next.include_unfiled=$('setting-unfiled').checked;
+    next.include_descendants=false;next.include_unfiled=$('setting-unfiled').checked;next.include_abstracts=$('setting-abstracts').checked;
     next.included_collections=[...$('setting-collections').querySelectorAll('input:checked')].map(input=>input.value);
     next.paper_types=[...$('setting-types').querySelectorAll('input:checked')].map(input=>input.value);
     next.default_groupers=groupOrder.filter(group=>activeGroupers.has(group));

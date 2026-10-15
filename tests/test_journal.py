@@ -204,6 +204,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn('id="journal-mode-annotations"', html)
         self.assertIn('id="view-dashboard"', html)
         self.assertIn('id="view-journal"', html)
+        self.assertIn('id="paper-overview-dialog"', html)
         self.assertIn('id="range-dialog"', html)
         self.assertIn('id="range-label"', html)
         self.assertIn('id="status-summary"', html)
@@ -241,6 +242,9 @@ class ReportTests(unittest.TestCase):
         report, _ = self.build()
         self.assertEqual(next(p for p in report["inventory"] if p["key"] == "PAPERA01")["resource_link"],
                          "https://doi.org/10.1234/example.paper")
+        paper = next(p for p in report["inventory"] if p["key"] == "PAPERA01")
+        self.assertEqual(paper["doi_link"], "https://doi.org/10.1234/example.paper")
+        self.assertEqual(paper["url_link"], "https://publisher.example/article")
         comment = next(entry for entry in report["journal"] if entry["key"] == "ANNOTCOM")
         self.assertEqual(comment["text"], "")
         self.assertEqual(comment["comment"], "A comment without a highlight")
@@ -248,6 +252,20 @@ class ReportTests(unittest.TestCase):
         report, _ = self.build()
         self.assertEqual(next(p for p in report["inventory"] if p["key"] == "PAPERA01")["resource_link"],
                          "https://publisher.example/article")
+        self.assertEqual(next(p for p in report["inventory"] if p["key"] == "PAPERA01")["doi_link"], "")
+
+    def test_abstracts_are_opt_in_for_app_and_export(self):
+        self.items[0]["data"]["abstractNote"] = "A concise research abstract."
+        report, _ = self.build()
+        paper = next(p for p in report["inventory"] if p["key"] == "PAPERA01")
+        self.assertEqual(paper["abstract"], "")
+        config = dict(self.config, include_abstracts=True)
+        report, _ = self.build_with_config(config)
+        paper = next(p for p in report["inventory"] if p["key"] == "PAPERA01")
+        self.assertEqual(paper["abstract"], "A concise research abstract.")
+        self.assertIn("A concise research abstract.", journal.render_html(report))
+        with self.assertRaisesRegex(ValueError, "Include abstracts"):
+            journal.validate_config(dict(config, include_abstracts="yes"))
 
     def test_configurable_status_tags_and_validation(self):
         config = json.loads(json.dumps(self.config))
