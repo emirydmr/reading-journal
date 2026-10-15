@@ -114,6 +114,19 @@
     .paper-overview-actions span { color: #8a9690; border-color: #e0e6e0; background: #f6f8f5; }
     .paper-overview-actions a:not(.event-action):hover { background: #eaf4ed; }
     .paper-overview-abstract { white-space: pre-wrap; line-height: 1.5; }
+    .paper-layout-switch { display: flex; gap: 5px; margin: 14px 0 10px; }
+    .paper-layout-switch button { border: 1px solid #c6d7cb; border-radius: 7px; background: #fff; color: #345d50; padding: 5px 11px; font-size: .73rem; font-weight: 700; cursor: pointer; }
+    .paper-layout-switch button[aria-pressed="true"] { background: #e8f4ec; border-color: #1e7464; color: #17645d; }
+    .paper-page-plot { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
+    .paper-plot-scale { display: flex; flex-direction: column; justify-content: space-between; flex: 0 0 24px; height: 160px; margin-top: 24px; color: #66736d; font-size: .68rem; text-align: right; }
+    .paper-plot-bars { display: flex; align-items: flex-end; flex: 1; min-width: 0; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+    .paper-plot-page { display: flex; flex: 1 0 48px; flex-direction: column; align-items: center; max-width: 76px; min-width: 48px; padding: 3px 4px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #294b40; cursor: pointer; }
+    .paper-plot-page:hover { background: #f4f8f4; }
+    .paper-plot-page[aria-pressed="true"] { border-color: #1e7464; background: #e8f4ec; }
+    .paper-plot-count,.paper-plot-label { display: block; font-size: .72rem; line-height: 20px; font-weight: 700; white-space: nowrap; }
+    .paper-plot-track { display: flex; align-items: flex-end; width: 100%; height: 160px; background: repeating-linear-gradient(to top,#e5ece7 0 1px,transparent 1px 80px); border-bottom: 1px solid #bfcfc4; }
+    .paper-plot-stack { display: flex; flex-direction: column-reverse; width: 100%; overflow: hidden; border-radius: 5px 5px 0 0; }
+    .paper-plot-stack i { display: block; min-height: 2px; }
     .paper-page-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(110px,1fr)); gap: 9px; }
     .paper-page { min-width: 0; border: 1px solid #d6e2d8; border-radius: 9px; background: #f8faf7; padding: 9px; color: #294b40; text-align: left; cursor: pointer; }
     .paper-page[aria-pressed="true"] { border-color: #1e7464; box-shadow: inset 0 0 0 1px #1e7464; background: #eef7f0; }
@@ -122,7 +135,7 @@
     .paper-page-bar i { display: block; min-width: 3px; background: var(--segment-color,#aab3af); }
     .paper-page-count { display: block; margin-top: 7px; font-size: .72rem; color: #66736d; }
     .paper-color-summary { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 15px; }
-    .paper-page-grid + h3 { margin-top: 22px; }
+    .paper-page-grid + h3,.paper-page-plot + h3 { margin-top: 22px; }
     .paper-overview-list .journal-entry { margin: 10px 0; }
     .paper-meta { display: block; color: #66736d; font-size: .76rem; margin-top: 2px; }
     .status-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }

@@ -29,6 +29,7 @@ let journalMode='feed';
 let selectedJournalDay=null;
 let paperOverviewKey=null;
 let paperOverviewPage=null;
+let paperOverviewLayout='plot';
 let selectedSizeDate = data.range.to;
 let selectedSizeMonth = data.range.to.slice(0,7);
 function monthLastDay(month){const [year,number]=month.split('-').map(Number);return new Date(Date.UTC(year,number,0)).toISOString().slice(0,10);}
@@ -269,7 +270,23 @@ function paperRow(paper) {
 }
 function paperPageOrder(a,b){const x=Number.parseFloat(a),y=Number.parseFloat(b);if(Number.isFinite(x)!==Number.isFinite(y))return Number.isFinite(x)?-1:1;return Number.isFinite(x)?x-y||a.localeCompare(b):a.localeCompare(b,undefined,{numeric:true});}
 function paperPageGroups(entries){const pages=new Map();entries.forEach(entry=>{const page=String(entry.page||'?');if(!pages.has(page))pages.set(page,[]);pages.get(page).push(entry);});return [...pages].sort((a,b)=>paperPageOrder(a[0],b[0]));}
+function paperPageColorCounts(entries){const counts=new Map();entries.forEach(entry=>{const color=validColor(entry.color)?entry.color.toLowerCase():'#aab3af',key=`${color}\u0000${entry.category}`;counts.set(key,(counts.get(key)||0)+1);});const order=new Map((data.color_legend||[]).map((item,index)=>[item.color.toLowerCase(),index]));return [...counts].map(([key,count])=>{const [color,category]=key.split('\u0000');return {color,category,count};}).sort((a,b)=>(order.get(a.color)??99)-(order.get(b.color)??99)||a.category.localeCompare(b.category));}
 function overviewLink(label,url){const node=el(url?'a':'span','',`${label}${url?'':' · unavailable'}`);if(url){node.href=url;node.target='_blank';node.rel='noopener noreferrer';}return node;}
+function selectOverviewPage(page,host){const scroll=host.scrollTop;paperOverviewPage=page;renderPaperOverview();host.scrollTop=scroll;}
+function renderPageTiles(groups,maxCount,host){
+  const grid=el('div','paper-page-grid');
+  groups.forEach(([page,items])=>{const button=el('button','paper-page');button.type='button';button.setAttribute('aria-pressed',String(page===paperOverviewPage));button.setAttribute('aria-label',`Page ${page}, ${items.length} annotations`);button.append(el('span','paper-page-label',`Page ${page}`));const bar=el('span','paper-page-bar');bar.style.width=`${Math.max(20,100*items.length/maxCount)}%`;items.forEach(entry=>{const segment=el('i');segment.style.flex='1';if(validColor(entry.color))segment.style.setProperty('--segment-color',entry.color);segment.title=entry.category;bar.append(segment);});button.append(bar,el('span','paper-page-count',`${items.length} annotation${items.length===1?'':'s'}`));button.addEventListener('click',()=>selectOverviewPage(page,host));grid.append(button);});
+  return grid;
+}
+function renderPagePlot(groups,maxCount,host){
+  const chart=el('div','paper-page-plot');chart.setAttribute('role','group');chart.setAttribute('aria-label','Annotations by paper page');
+  const scale=el('div','paper-plot-scale');scale.append(el('span','',String(maxCount)),el('span','',String(Math.round(maxCount/2))),el('span','','0'));chart.append(scale);
+  const bars=el('div','paper-plot-bars');chart.append(bars);
+  groups.forEach(([page,items])=>{const categories=paperPageColorCounts(items),button=el('button','paper-plot-page');button.type='button';button.setAttribute('aria-pressed',String(page===paperOverviewPage));button.setAttribute('aria-label',`Page ${page}, ${items.length} annotations: ${categories.map(item=>`${item.count} ${item.category}`).join(', ')}`);
+    const count=el('span','paper-plot-count',String(items.length)),track=el('span','paper-plot-track'),stack=el('span','paper-plot-stack');stack.style.height=`${Math.max(3,160*items.length/maxCount)}px`;
+    categories.forEach(item=>{const segment=el('i');segment.style.flex=String(item.count);segment.style.backgroundColor=item.color;segment.title=`${item.category}: ${item.count}`;stack.append(segment);});track.append(stack);button.append(count,track,el('span','paper-plot-label',`p. ${page}`));button.addEventListener('click',()=>selectOverviewPage(page,host));bars.append(button);});
+  return chart;
+}
 function renderPaperOverview(){
   const host=$('paper-overview-content');host.replaceChildren();
   const paper=data.inventory.find(item=>item.key===paperOverviewKey);
@@ -279,16 +296,16 @@ function renderPaperOverview(){
   host.append(el('p','help',paper.collections.join(' · ')));
   const actions=el('div','paper-overview-actions');actions.append(eventAction(paper.zotero_link,'Open paper in Zotero','paper')||overviewLink('Zotero',null),overviewLink('DOI',paper.doi_link),overviewLink('Website',paper.url_link));host.append(actions);
   const tags=el('section','paper-overview-section');tags.append(el('h3','','Tags'));const tagList=el('div','status-tags');tagList.style.justifyContent='flex-start';const names=[...new Set(Object.values(paper.tags).flat())];if(names.length)names.forEach(name=>tagList.append(tagChip(name)));else tagList.append(el('span','small','No tags'));tags.append(tagList);host.append(tags);
-  if(paper.abstract){const section=el('section','paper-overview-section');section.append(el('h3','','Abstract'),el('p','paper-overview-abstract',paper.abstract));host.append(section);}
-  else if(appConfig&&!appConfig.include_abstracts){const section=el('section','paper-overview-section');section.append(el('h3','','Abstract'),el('p','small','Not included. Enable abstracts in Settings to show them here and in exports.'));host.append(section);}
+  {const abstract=el('section','paper-overview-section');abstract.append(el('h3','','Abstract'),el('p',paper.abstract?'paper-overview-abstract':'small',paper.abstract||'No abstract available for this paper.'));host.append(abstract);}
   const section=el('section','paper-overview-section');section.append(el('h3','','Annotations by page'),el('p','help',`${entries.length} annotation${entries.length===1?'':'s'} in the selected report range · select a page to inspect its annotations.`));host.append(section);
   const categoryCounts=new Map();entries.forEach(entry=>{const key=entry.category+'\u0000'+entry.color;categoryCounts.set(key,(categoryCounts.get(key)||0)+1);});
   if(categoryCounts.size){const summary=el('div','paper-color-summary');[...categoryCounts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).forEach(([key,count])=>{const [label,color]=key.split('\u0000'),badge=el('span','badge event-category',`${label} · ${count}`);if(validColor(color))badge.style.setProperty('--annotation-color',color);summary.append(badge);});section.append(summary);}
-  const groups=paperPageGroups(entries),grid=el('div','paper-page-grid');section.append(grid);
+  const groups=paperPageGroups(entries);
   if(!groups.length){section.append(el('p','small','No annotations for this paper in the selected range.'));paperOverviewPage=null;return;}
   if(!groups.some(([page])=>page===paperOverviewPage))paperOverviewPage=groups[0][0];
   const maxCount=Math.max(...groups.map(([,items])=>items.length));
-  groups.forEach(([page,items])=>{const button=el('button','paper-page');button.type='button';button.setAttribute('aria-pressed',String(page===paperOverviewPage));button.setAttribute('aria-label',`Page ${page}, ${items.length} annotations`);button.append(el('span','paper-page-label',`Page ${page}`));const bar=el('span','paper-page-bar');bar.style.width=`${Math.max(20,100*items.length/maxCount)}%`;items.forEach(entry=>{const segment=el('i');segment.style.flex='1';if(validColor(entry.color))segment.style.setProperty('--segment-color',entry.color);segment.title=entry.category;bar.append(segment);});button.append(bar,el('span','paper-page-count',`${items.length} annotation${items.length===1?'':'s'}`));button.addEventListener('click',()=>{const scroll=host.scrollTop;paperOverviewPage=page;renderPaperOverview();host.scrollTop=scroll;});grid.append(button);});
+  const layout=el('div','paper-layout-switch');[['plot','Bar plot'],['tiles','Page tiles']].forEach(([mode,label])=>{const button=el('button','',label);button.type='button';button.setAttribute('aria-pressed',String(paperOverviewLayout===mode));button.addEventListener('click',()=>{if(paperOverviewLayout===mode)return;const scroll=host.scrollTop;paperOverviewLayout=mode;renderPaperOverview();host.scrollTop=scroll;});layout.append(button);});section.append(layout);
+  section.append(paperOverviewLayout==='plot'?renderPagePlot(groups,maxCount,host):renderPageTiles(groups,maxCount,host));
   const selected=groups.find(([page])=>page===paperOverviewPage)[1],list=el('div','paper-overview-list');section.append(el('h3','',`Page ${paperOverviewPage}`),list);
   selected.forEach(entry=>{const card=el('article','journal-entry');if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);const top=el('div','journal-top'),heading=el('div');heading.append(el('strong','',entry.category),el('span','paper-meta',`${entry.event_type} · ${fmt(entry.event_at)}`));const actions=el('div','event-actions');const open=eventAction(entry.zotero_link,'Open annotation in Zotero’s PDF reader','annotation');if(open)actions.append(open);top.append(heading,actions);card.append(top);if(entry.text)card.append(el('div','paper-meta','Highlighted source text'),el('blockquote','',entry.text));if(entry.comment)card.append(el('div','paper-meta','Annotation comment'),el('p','comment',entry.comment));list.append(card);});
 }

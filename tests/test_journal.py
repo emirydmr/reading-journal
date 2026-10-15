@@ -254,16 +254,18 @@ class ReportTests(unittest.TestCase):
                          "https://publisher.example/article")
         self.assertEqual(next(p for p in report["inventory"] if p["key"] == "PAPERA01")["doi_link"], "")
 
-    def test_abstracts_are_opt_in_for_app_and_export(self):
+    def test_abstracts_are_always_in_app_but_optional_in_export(self):
         self.items[0]["data"]["abstractNote"] = "A concise research abstract."
         report, _ = self.build()
         paper = next(p for p in report["inventory"] if p["key"] == "PAPERA01")
-        self.assertEqual(paper["abstract"], "")
+        self.assertEqual(paper["abstract"], "A concise research abstract.")
+        self.assertIn("A concise research abstract.", journal.render_html(report, app_config=self.config, app_catalog={}))
+        self.assertNotIn("A concise research abstract.", journal.render_html(report))
         config = dict(self.config, include_abstracts=True)
         report, _ = self.build_with_config(config)
         paper = next(p for p in report["inventory"] if p["key"] == "PAPERA01")
         self.assertEqual(paper["abstract"], "A concise research abstract.")
-        self.assertIn("A concise research abstract.", journal.render_html(report))
+        self.assertIn("A concise research abstract.", journal.render_html(report, include_abstracts=True))
         with self.assertRaisesRegex(ValueError, "Include abstracts"):
             journal.validate_config(dict(config, include_abstracts="yes"))
 

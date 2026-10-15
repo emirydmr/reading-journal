@@ -188,7 +188,7 @@ def handler_factory(token: str):
                     catalog = make_catalog(items, collections, tags, config, diagnostics)
                     self.respond(json.dumps({"report": report, "catalog": catalog}, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
                 elif path == "/export":
-                    html = journal.render_html(report).encode("utf-8")
+                    html = journal.render_html(report, include_abstracts=config.get("include_abstracts", False)).encode("utf-8")
                     filename = f"Reading-Journal-{first.isoformat()}-to-{last.isoformat()}.html"
                     self.respond(html, "text/html; charset=utf-8", extra={"Content-Disposition": f'attachment; filename="{filename}"'})
                 else:

@@ -528,7 +528,7 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
             "resource_link": resource_link,
             "doi_link": doi_link,
             "url_link": url_link,
-            "abstract": (paper.get("abstractNote") or "") if config.get("include_abstracts", False) else "",
+            "abstract": paper.get("abstractNote") or "",
             "zotero_link": zotero_paper_link(paper["key"]),
         })
         common = {
@@ -595,9 +595,12 @@ def safe_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
 
-def export_window_report(report: dict) -> dict:
+def export_window_report(report: dict, *, include_abstracts: bool = False) -> dict:
     """Keep only papers with activity in the chosen export window."""
     limited = copy.deepcopy(report)
+    if not include_abstracts:
+        for paper in limited["inventory"]:
+            paper.pop("abstract", None)
     for section in ("inventory", "activity", "journal"):
         for entry in limited[section]:
             entry.pop("zotero_link", None)
@@ -630,11 +633,12 @@ def export_window_report(report: dict) -> dict:
     return limited
 
 
-def render_html(report: dict, *, app_config: dict | None = None, app_catalog: dict | None = None, app_token: str = "") -> str:
+def render_html(report: dict, *, app_config: dict | None = None, app_catalog: dict | None = None,
+                app_token: str = "", include_abstracts: bool = False) -> str:
     template = (WEB / "template.html").read_text(encoding="utf-8")
     app_mode = app_config is not None
     if not app_mode:
-        report = export_window_report(report)
+        report = export_window_report(report, include_abstracts=include_abstracts)
     controls = (WEB / "app-controls.html").read_text(encoding="utf-8") if app_mode else ""
     app_js = (WEB / "app-ui.js").read_text(encoding="utf-8") if app_mode else ""
     replacements = {
@@ -682,7 +686,7 @@ def main() -> int:
             print(f"Reading Journal warning: {diagnostic}", file=sys.stderr)
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(render_html(report), encoding="utf-8")
+        args.out.write_text(render_html(report, include_abstracts=config.get("include_abstracts", False)), encoding="utf-8")
         active_papers = len({event["paper_key"] for event in report["activity"]})
         print(f"Wrote {args.out.resolve()} ({len(report['journal'])} journal entries, {active_papers} papers active in the exported period)")
         return 0

@@ -22,6 +22,11 @@ assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Unassigned',revi
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Read',revisit:true}})",context),false);
 context.pageEntries=[{page:'10',key:'a'},{page:'2',key:'b'},{page:'2',key:'c'}];
 assert.deepEqual(Array.from(vm.runInContext('paperPageGroups(pageEntries)',context),group=>[group[0],group[1].length]),[['2',2],['10',1]]);
+context.testingEntries=[1,3,8,15,24,18,9,5,3,2,1,1].flatMap((count,page)=>
+  Array.from({length:count},(_,index)=>({page:String(page+1),category:index%3===0?'Important':'Methods',color:index%3===0?'#ffd400':'#f19837'})));
+assert.deepEqual(Array.from(vm.runInContext('paperPageGroups(testingEntries)',context),group=>group[1].length),[1,3,8,15,24,18,9,5,3,2,1,1]);
+context.testingPage=context.testingEntries.filter(entry=>entry.page==='5');
+assert.deepEqual(Array.from(vm.runInContext('paperPageColorCounts(testingPage)',context),item=>[item.category,item.count]),[['Important',8],['Methods',16]]);
 context.rows = [
   {key:'A',status_group:'Read',paper_key:'P1',paper_title:'Paper 1',category:'Important',collection_group:'02 + 04',periods:{day:'2026-10-14',week:'2026-W42',month:'2026-10'}},
   {key:'B',status_group:'Read',paper_key:'P1',paper_title:'Paper 1',category:'Question',collection_group:'02 + 04',periods:{day:'2026-10-15',week:'2026-W42',month:'2026-10'}},
