@@ -6,6 +6,7 @@
   "default_window_days": 30,
   "timezone": "Asia/Shanghai",
   "default_groupers": ["status", "paper", "category"],
+  "grouper_order": ["status", "paper", "category", "collection", "day", "week", "month", "timestamp"],
   "status_roles": {
     "to_read": {"tag": "status/to-read", "label": "To read", "color": "#87958d", "background": "#f3f5f2"},
     "reading": {"tag": "status/reading", "label": "Reading", "color": "#4c87bd", "background": "#edf5fb"},

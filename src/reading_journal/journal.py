@@ -34,7 +34,7 @@ DEFAULT_STATUS_ROLES = {
 }
 PRIMARY_STATUSES = {DEFAULT_STATUS_ROLES[role]["tag"]: DEFAULT_STATUS_ROLES[role]["label"] for role in ("to_read", "reading", "read")}
 SUPPLEMENTARY_STATUS = DEFAULT_STATUS_ROLES["revisit"]["tag"]
-GROUPERS = ("status", "paper", "category", "collection", "day", "week", "month")
+GROUPERS = ("status", "paper", "category", "collection", "day", "week", "month", "timestamp")
 ANNOTATION_CREATION_GRACE = timedelta(minutes=20)
 
 
@@ -155,6 +155,9 @@ def validate_config(raw: dict) -> dict:
     groupers = config.setdefault("default_groupers", ["status", "paper", "category"])
     if not isinstance(groupers, list) or any(not isinstance(group, str) for group in groupers) or len(groupers) != len(set(groupers)) or any(group not in GROUPERS for group in groupers):
         raise ValueError("Default groupers must be unique known dimensions")
+    order = config.setdefault("grouper_order", [*groupers, *(group for group in GROUPERS if group not in groupers)])
+    if not isinstance(order, list) or len(order) != len(GROUPERS) or any(not isinstance(group, str) for group in order) or set(order) != set(GROUPERS):
+        raise ValueError("Grouper order must contain every known dimension once")
     for field in ("included_collections", "paper_types"):
         if not isinstance(config.get(field, []), list) or any(not isinstance(item, str) for item in config.get(field, [])):
             raise ValueError(f"{field} must be a list of names")
@@ -580,6 +583,7 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
         "status_roles": config["status_roles"],
         "tag_styles": tag_styles,
         "default_groupers": config["default_groupers"],
+        "grouper_order": config["grouper_order"],
         "collections": collection_list,
         "inventory": inventory,
         "activity": activity,

@@ -117,15 +117,22 @@ if (appConfig) {
   $('app-settings').addEventListener('click',()=>{fillSettings();dialog.showModal();});
   $('setting-timezone-country').addEventListener('change',()=>renderTimezoneCities($('setting-timezone-country').value));
   $('setting-timezone').addEventListener('change',previewTimezone);
-  const saveGrouping=el('button','secondary','Save grouping as default');saveGrouping.type='button';$('groupers').after(saveGrouping);
-  saveGrouping.addEventListener('click',async()=>{
-    const next=JSON.parse(JSON.stringify(appConfig));next.default_groupers=groupOrder.filter(group=>activeGroupers.has(group));
-    try{
-      const response=await fetch('/settings?token='+encodeURIComponent(appToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:next,from:data.range.from,to:data.range.to})});
-      const answer=await response.json();if(!response.ok)throw new Error(answer.error||'Could not save grouping');
-      saveGrouping.textContent='Grouping saved';
-    }catch(error){saveGrouping.textContent=error.message;}
-  });
+  const groupingStatus=el('p','grouping-save-status');groupingStatus.setAttribute('role','status');$('groupers').after(groupingStatus);
+  let pendingGrouping=null,savingGrouping=false;
+  async function saveGrouping(){
+    savingGrouping=true;
+    while(pendingGrouping){
+      const change=pendingGrouping;pendingGrouping=null;
+      try{
+        const response=await fetch('/grouping?token='+encodeURIComponent(appToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(change)});
+        const answer=await response.json();if(!response.ok)throw new Error(answer.error||'Could not save grouping');
+        appConfig.default_groupers=change.groupers;appConfig.grouper_order=change.order;
+        if(!pendingGrouping)groupingStatus.textContent='';
+      }catch(error){groupingStatus.textContent=`Could not save grouping: ${error.message}`;}
+    }
+    savingGrouping=false;
+  }
+  window.persistGroupingPreference=(groupers,order)=>{pendingGrouping={groupers,order};groupingStatus.textContent='';if(!savingGrouping)void saveGrouping();};
   $('settings-close').addEventListener('click',dismiss);$('settings-cancel').addEventListener('click',dismiss);
   $('add-category').addEventListener('click',()=>categoryRow('New category',{prefix:'new/',allowed_tags:[],tags:{},color:'#7b9185',selection_mode:'explicit'}));
   let refreshing=false,reportSignature=JSON.stringify([data,appCatalog]);
@@ -152,6 +159,7 @@ if (appConfig) {
     next.included_collections=[...$('setting-collections').querySelectorAll('input:checked')].map(input=>input.value);
     next.paper_types=[...$('setting-types').querySelectorAll('input:checked')].map(input=>input.value);
     next.default_groupers=groupOrder.filter(group=>activeGroupers.has(group));
+    next.grouper_order=[...groupOrder];
     next.annotation_colors={...appConfig.annotation_colors};for(const row of $('setting-colors').children){const edit=row.editor;next.annotation_colors[edit.hex]={label:edit.meaningInput.value.trim(),description:edit.descriptionInput.value.trim()};}
     next.tag_schema_version=2;next.tag_categories={};for(const card of $('setting-categories').children){const edit=card.editor,name=edit.name.value.trim();if(next.tag_categories[name]){$('settings-error').textContent=`Duplicate category: ${name}`;return;}
       const tags={};for(const row of edit.rows.values()){const tag=row.editor,key=tag.key.value.trim();if(tags[key]){$('settings-error').textContent=`Duplicate tag: ${key}`;return;}tags[key]={label:tag.label.value.trim(),color:tag.color.value,description:tag.description.value.trim(),reading_role:tag.role.value};}

@@ -226,6 +226,20 @@ def handler_factory(token: str):
                 except Exception as exc:
                     self.error(str(exc))
                 return
+            if path == "/grouping":
+                try:
+                    size = int(self.headers.get("Content-Length", "0"))
+                    if size <= 0 or size > 10_000:
+                        raise ValueError("Invalid grouping size")
+                    payload = json.loads(self.rfile.read(size))
+                    config = journal.load_config()
+                    config["default_groupers"] = payload["groupers"]
+                    config["grouper_order"] = payload["order"]
+                    save_config(journal.validate_config(config))
+                    self.respond(b'{"ok":true}', "application/json; charset=utf-8")
+                except Exception as exc:
+                    self.error(str(exc))
+                return
             if path != "/settings":
                 self.error("Not found", 404)
                 return

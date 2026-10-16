@@ -183,6 +183,8 @@
     .grouper button { min-height: calc(var(--control-height) - 2px); background: transparent; border: 0; color: inherit; padding: 0 8px; font-size: .79rem; }
     .grouper .move { border-left: 1px solid #d2ded5; padding-inline: 6px; }
     .grouper[draggable="true"] { cursor: grab; }
+    .grouping-save-status { margin: 0 0 8px; color: #a34242; font-size: .8rem; }
+    .grouping-save-status:empty { display: none; }
     .journal-group { margin: 9px 0; border: 1px solid #dfe7df; border-radius: 10px; background: white; }
     .journal-group > summary { cursor: pointer; padding: 10px 13px; font-weight: 700; color: #244f43; }
     .journal-group-body { padding: 0 11px 10px 15px; }
@@ -192,6 +194,10 @@
     .journal-actions { align-self: start; }
     .journal-entry:focus { outline: 2px solid #8cbda6; outline-offset: 2px; }
     .journal-entry blockquote { white-space: pre-wrap; margin: 9px 0 15px; color: #687770; font-size: .89rem; font-style: italic; line-height: 1.55; }
+    .journal-entry blockquote.source-text-collapsible { margin-bottom: 3px; }
+    .source-text-toggle { display: block; margin: 0 0 12px; padding: 2px 0; border: 0; background: transparent; color: #17645d; font-size: .75rem; font-weight: 700; cursor: pointer; }
+    .source-text-toggle:hover { text-decoration: underline; }
+    .source-text-toggle:focus-visible { outline: 2px solid #1e7464; outline-offset: 2px; border-radius: 2px; }
     .journal-entry .comment { white-space: pre-wrap; margin: 7px 0; color: #294b40; font-weight: 500; }
     .empty { text-align: center; padding: 37px 20px; color: #65736e; }
     dialog { border: 1px solid #d8e4db; border-radius: 14px; padding: 0; width: min(850px,94vw); max-height: 88vh; box-shadow: 0 20px 70px #0004; }

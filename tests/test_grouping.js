@@ -19,10 +19,24 @@ const context = vm.createContext({
 vm.runInContext(setup, context);
 const legendHost={children:[],replaceChildren(){this.children=[];},append(node){this.children.push(node);}};
 context.document.getElementById=id=>id==='color-legend'?legendHost:{addEventListener:()=>{}};
-context.document.createElement=tag=>({tag,children:[],style:{setProperty(){}},append(...nodes){this.children.push(...nodes);}});
+context.document.createElement=tag=>({tag,children:[],style:{setProperty(){}},append(...nodes){this.children.push(...nodes);},setAttribute(name,value){this[name]=value;},addEventListener(_name,listener){this.listener=listener;}});
 context.data.color_legend=[{color:'#ffd400',label:'Important',description:'Keep'}];
 vm.runInContext('drawLegend();drawLegend()',context);
 assert.equal(legendHost.children.length,1);
+assert.equal(vm.runInContext('sourceTextPreview("Short source text")',context),null);
+context.longSource='A long highlighted passage '.repeat(20);
+const preview=vm.runInContext('sourceTextPreview(longSource)',context);
+assert.ok(Array.from(preview).length<=361);
+assert.ok(preview.endsWith('…'));
+context.sourceCard={children:[],append(...nodes){this.children.push(...nodes);}};
+context.sourceEntry={key:'ANNOT1',text:context.longSource};
+vm.runInContext('appendOriginalText(sourceCard,sourceEntry)',context);
+assert.equal(context.sourceCard.children.length,3);
+assert.equal(context.sourceCard.children[1].textContent,preview);
+assert.equal(context.sourceCard.children[2].textContent,'Show more');
+context.sourceCard.children[2].listener();
+assert.equal(context.sourceCard.children[1].textContent,context.longSource);
+assert.equal(context.sourceCard.children[2].textContent,'Show less');
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Unassigned',revisit:false}})",context),true);
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Unassigned',revisit:true}})",context),false);
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Read',revisit:true}})",context),false);
@@ -38,6 +52,11 @@ context.rows = [
   {key:'B',status_group:'Read',paper_key:'P1',paper_title:'Paper 1',category:'Question',collection_group:'02 + 04',periods:{day:'2026-10-15',week:'2026-W42',month:'2026-10'}},
   {key:'C',status_group:'To read',paper_key:'P2',paper_title:'Paper 2',category:'Question',collection_group:'03',periods:{day:'2026-09-30',week:'2026-W40',month:'2026-09'}},
 ];
+context.data.timezone='Asia/Shanghai';
+context.timestampEntry={event_at:'2026-10-14T09:15:30Z'};
+assert.deepEqual(Array.from(vm.runInContext("groupValue(timestampEntry,'timestamp')",context)),['2026-10-14 17:15:30','2026-10-14 17:15:30']);
+context.timestampRows=[{key:'older',event_at:'2026-10-14T09:15:30Z'},{key:'newer',event_at:'2026-10-14T09:16:30Z'}];
+assert.deepEqual(Array.from(vm.runInContext("buildGroupTree(timestampRows,['timestamp']).groups",context),group=>group.child.entries[0].key),['newer','older']);
 
 const dimensions = ['status', 'paper', 'category', 'collection', 'day', 'week', 'month'];
 const permutations = values => values.length ? values.flatMap((value,index)=>permutations(values.filter((_,i)=>i!==index)).map(rest=>[value,...rest])) : [[]];

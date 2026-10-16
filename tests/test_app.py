@@ -94,6 +94,7 @@ class AppServerTests(unittest.TestCase):
             self.assertIn('id="journal-mode-feed"', html)
             self.assertIn('id="journal-mode-annotations"', html)
             self.assertNotIn('id="view-feed"', html)
+            self.assertNotIn('Save grouping as default', html)
             for picker in ("feed-type", "journal-category", "journal-collection", "journal-tag"):
                 self.assertIn(f'<div id="{picker}"></div>', html)
                 self.assertNotIn(f'<select id="{picker}"', html)
@@ -145,6 +146,25 @@ class AppServerTests(unittest.TestCase):
             self.request(route, invalid)
         self.assertEqual(rejected.exception.code, 400)
         self.saved.assert_called_once()
+
+    def test_grouping_saves_selection_and_order(self):
+        route = f"/grouping?token={self.token}"
+        order = ["timestamp", "paper", "status", "category", "collection", "day", "week", "month"]
+        with self.request(route, {"groupers": ["timestamp", "paper"], "order": order}) as response:
+            self.assertEqual(response.status, 200)
+        saved = self.saved.call_args.args[0]
+        self.assertEqual(saved["default_groupers"], ["timestamp", "paper"])
+        self.assertEqual(saved["grouper_order"], order)
+        for invalid in ({"groupers": ["timestamp"], "order": order[:-1]},
+                        {"groupers": ["timestamp", "timestamp"], "order": order},
+                        {"groupers": ["unknown"], "order": order}):
+            with self.assertRaises(urllib.error.HTTPError) as rejected:
+                self.request(route, invalid)
+            self.assertEqual(rejected.exception.code, 400)
+        self.saved.assert_called_once()
+        with self.assertRaises(urllib.error.HTTPError) as denied:
+            self.request("/grouping?token=wrong", {"groupers": [], "order": order})
+        self.assertEqual(denied.exception.code, 403)
 
 
 class ConfigPersistenceTests(unittest.TestCase):

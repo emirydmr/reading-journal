@@ -20,8 +20,8 @@ function eventAction(url,label,kind){
   return link;
 }
 const palette = ['#1e7464','#e1a64b','#5878b9','#af718f','#86a85d','#b88258','#708d9a','#b8aa64','#7d79b1','#c2706f'];
-const allGroupers = ['status','paper','category','collection','day','week','month'];
-let groupOrder = [...data.default_groupers,...allGroupers.filter(group=>!data.default_groupers.includes(group))];
+const allGroupers = ['status','paper','category','collection','day','week','month','timestamp'];
+let groupOrder = [...(data.grouper_order||data.default_groupers),...allGroupers.filter(group=>!(data.grouper_order||data.default_groupers).includes(group))];
 let activeGroupers = new Set(data.default_groupers);
 let visibleRange = {...data.range};
 let visibleData;
@@ -30,6 +30,8 @@ let selectedJournalDay=null;
 let paperOverviewKey=null;
 let paperOverviewPage=null;
 let paperOverviewLayout='plot';
+const SOURCE_TEXT_LIMIT=360;
+const expandedSourceTexts=new Set();
 let selectedSizeDate = data.range.to;
 let selectedSizeMonth = data.range.to.slice(0,7);
 function monthLastDay(month){const [year,number]=month.split('-').map(Number);return new Date(Date.UTC(year,number,0)).toISOString().slice(0,10);}
@@ -271,6 +273,22 @@ function paperRow(paper) {
 }
 function paperPageOrder(a,b){const x=Number.parseFloat(a),y=Number.parseFloat(b);if(Number.isFinite(x)!==Number.isFinite(y))return Number.isFinite(x)?-1:1;return Number.isFinite(x)?x-y||a.localeCompare(b):a.localeCompare(b,undefined,{numeric:true});}
 function paperPageGroups(entries){const pages=new Map();entries.forEach(entry=>{const page=String(entry.page||'?');if(!pages.has(page))pages.set(page,[]);pages.get(page).push(entry);});return [...pages].sort((a,b)=>paperPageOrder(a[0],b[0]));}
+function sourceTextPreview(text){
+  const characters=Array.from(text);
+  if(characters.length<=SOURCE_TEXT_LIMIT)return null;
+  const head=characters.slice(0,SOURCE_TEXT_LIMIT).join(''),boundary=head.search(/\s+\S*$/u);
+  return (boundary>=SOURCE_TEXT_LIMIT-60?head.slice(0,boundary):head).trimEnd()+'…';
+}
+function appendOriginalText(card,entry){
+  if(!entry.text)return;
+  const preview=sourceTextPreview(entry.text),quote=el('blockquote',preview?'source-text-collapsible':'',entry.text);
+  card.append(el('div','paper-meta','Highlighted source text'),quote);
+  if(!preview)return;
+  const toggle=el('button','source-text-toggle');toggle.type='button';
+  const render=()=>{const expanded=expandedSourceTexts.has(entry.key);quote.textContent=expanded?entry.text:preview;toggle.textContent=expanded?'Show less':'Show more';toggle.setAttribute('aria-expanded',String(expanded));};
+  toggle.addEventListener('click',()=>{if(expandedSourceTexts.has(entry.key))expandedSourceTexts.delete(entry.key);else expandedSourceTexts.add(entry.key);render();});
+  render();card.append(toggle);
+}
 function paperPageColorCounts(entries){const counts=new Map();entries.forEach(entry=>{const color=validColor(entry.color)?entry.color.toLowerCase():'#aab3af',key=`${color}\u0000${entry.category}`;counts.set(key,(counts.get(key)||0)+1);});const order=new Map((data.color_legend||[]).map((item,index)=>[item.color.toLowerCase(),index]));return [...counts].map(([key,count])=>{const [color,category]=key.split('\u0000');return {color,category,count};}).sort((a,b)=>(order.get(a.color)??99)-(order.get(b.color)??99)||a.category.localeCompare(b.category));}
 function overviewLink(label,url){const node=el(url?'a':'span','',`${label}${url?'':' · unavailable'}`);if(url){node.href=url;node.target='_blank';node.rel='noopener noreferrer';}return node;}
 function selectOverviewPage(page,host){const scroll=host.scrollTop;paperOverviewPage=page;renderPaperOverview();host.scrollTop=scroll;}
@@ -308,7 +326,7 @@ function renderPaperOverview(){
   const layout=el('div','paper-layout-switch');[['plot','Bar plot'],['tiles','Page tiles']].forEach(([mode,label])=>{const button=el('button','',label);button.type='button';button.setAttribute('aria-pressed',String(paperOverviewLayout===mode));button.addEventListener('click',()=>{if(paperOverviewLayout===mode)return;const scroll=host.scrollTop;paperOverviewLayout=mode;renderPaperOverview();host.scrollTop=scroll;});layout.append(button);});section.append(layout);
   section.append(paperOverviewLayout==='plot'?renderPagePlot(groups,maxCount,host):renderPageTiles(groups,maxCount,host));
   const selected=groups.find(([page])=>page===paperOverviewPage)[1],list=el('div','paper-overview-list');section.append(el('h3','',`Page ${paperOverviewPage}`),list);
-  selected.forEach(entry=>{const card=el('article','journal-entry');if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);const top=el('div','journal-top'),heading=el('div');heading.append(el('strong','',entry.category),el('span','paper-meta',`${entry.event_type} · ${fmt(entry.event_at)}`));const actions=el('div','event-actions');const open=eventAction(entry.zotero_link,'Open annotation in Zotero’s PDF reader','annotation');if(open)actions.append(open);top.append(heading,actions);card.append(top);if(entry.text)card.append(el('div','paper-meta','Highlighted source text'),el('blockquote','',entry.text));if(entry.comment)card.append(el('div','paper-meta','Annotation comment'),el('p','comment',entry.comment));list.append(card);});
+  selected.forEach(entry=>{const card=el('article','journal-entry');if(validColor(entry.color))card.style.setProperty('--annotation-color',entry.color);const top=el('div','journal-top'),heading=el('div');heading.append(el('strong','',entry.category),el('span','paper-meta',`${entry.event_type} · ${fmt(entry.event_at)}`));const actions=el('div','event-actions');const open=eventAction(entry.zotero_link,'Open annotation in Zotero’s PDF reader','annotation');if(open)actions.append(open);top.append(heading,actions);card.append(top);appendOriginalText(card,entry);if(entry.comment)card.append(el('div','paper-meta','Annotation comment'),el('p','comment',entry.comment));list.append(card);});
 }
 function openPaperOverview(key){paperOverviewKey=key;paperOverviewPage=null;renderPaperOverview();$('paper-overview-dialog').showModal();}
 $('paper-overview-close').addEventListener('click',()=>$('paper-overview-dialog').close());
@@ -402,7 +420,7 @@ function annotationCard(entry) {
   const paperOpen=eventAction(entry.paper_zotero_link,'Open paper in Zotero','paper');if(paperOpen)actions.append(paperOpen);
   top.append(heading,actions);card.append(top,el('div','paper-meta',`${entry.event_type} · ${fmt(entry.event_at)}`));
   card.append(el('div','paper-meta',`Current status: ${entry.status_group} · Current collection: ${entry.collection_group} · p. ${entry.page}`));
-  if(entry.text){card.append(el('div','paper-meta','Highlighted source text'),el('blockquote','',entry.text));}
+  appendOriginalText(card,entry);
   if(entry.comment){card.append(el('div','paper-meta','Annotation comment'),el('p','comment',entry.comment));}
   if(entry.tags.length){const tags=el('div','status-tags');entry.tags.forEach(tag=>tags.append(tagChip(tag)));card.append(tags);}
   return card;
@@ -424,6 +442,13 @@ function groupValue(entry,dimension) {
   if(dimension==='status')return [entry.status_group,entry.status_group];
   if(dimension==='category')return [entry.category,entry.category];
   if(dimension==='collection')return [entry.collection_group,entry.collection_group];
+  if(dimension==='timestamp'){
+    const date=new Date(entry.event_at||'');
+    if(!Number.isFinite(date.getTime()))return ['','Unknown timestamp'];
+    const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:data.timezone||'UTC',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(date).filter(part=>part.type!=='literal').map(part=>[part.type,part.value]));
+    const key=`${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+    return [key,key];
+  }
   const key=entry.periods?.[dimension]||'';
   if(!key)return ['',`Unknown ${dimension}`];
   if(dimension==='week')return [key,`Week ${Number(key.slice(-2))} · ${key.slice(0,4)}`];
@@ -436,7 +461,7 @@ function buildGroupTree(items,dimensions,depth=0) {
   const dimension=dimensions[depth],groups=new Map();
   items.forEach(entry=>{const [key,label]=groupValue(entry,dimension);if(!groups.has(key))groups.set(key,{key,label,items:[]});groups.get(key).items.push(entry);});
   const nodes=[...groups.values()].sort((a,b)=>{
-    if(['day','week','month'].includes(dimension))return b.key.localeCompare(a.key);
+    if(['day','week','month','timestamp'].includes(dimension))return b.key.localeCompare(a.key);
     if(dimension==='status'){
       const order=[data.status_roles.to_read.label,data.status_roles.reading.label,data.status_roles.read.label,data.status_roles.revisit.label,'Unassigned','Conflicting statuses'];
       return order.indexOf(a.key)-order.indexOf(b.key);
@@ -447,16 +472,17 @@ function buildGroupTree(items,dimensions,depth=0) {
 }
 function renderGroupers() {
   const host=$('groupers');host.replaceChildren();
-  const labels={status:'Status',paper:'Paper',category:'Annotation category',collection:'Collection',day:'Day',week:'Week',month:'Month'};
+  const labels={status:'Status',paper:'Paper',category:'Annotation category',collection:'Collection',day:'Day',week:'Week',month:'Month',timestamp:'Timestamp'};
+  const changed=()=>{renderGroupers();renderJournal();if(appConfig&&window.persistGroupingPreference)window.persistGroupingPreference(groupOrder.filter(group=>activeGroupers.has(group)),[...groupOrder]);};
   groupOrder.forEach((dimension,index)=>{
     const chip=el('div',`grouper${activeGroupers.has(dimension)?'':' inactive'}`);chip.draggable=true;chip.dataset.group=dimension;
-    const toggle=el('button','',labels[dimension]);toggle.type='button';toggle.setAttribute('aria-pressed',String(activeGroupers.has(dimension)));toggle.addEventListener('click',()=>{if(activeGroupers.has(dimension))activeGroupers.delete(dimension);else activeGroupers.add(dimension);renderGroupers();renderJournal();});chip.append(toggle);
+    const toggle=el('button','',labels[dimension]);toggle.type='button';toggle.setAttribute('aria-pressed',String(activeGroupers.has(dimension)));toggle.addEventListener('click',()=>{if(activeGroupers.has(dimension))activeGroupers.delete(dimension);else activeGroupers.add(dimension);changed();});chip.append(toggle);
     for(const [symbol,delta,label] of [['←',-1,'Move left'],['→',1,'Move right']]){
-      const move=el('button','move',symbol);move.type='button';move.title=`${label}: ${labels[dimension]}`;move.setAttribute('aria-label',move.title);move.disabled=index+delta<0||index+delta>=groupOrder.length;move.addEventListener('click',()=>{const other=index+delta;[groupOrder[index],groupOrder[other]]=[groupOrder[other],groupOrder[index]];renderGroupers();renderJournal();});chip.append(move);
+      const move=el('button','move',symbol);move.type='button';move.title=`${label}: ${labels[dimension]}`;move.setAttribute('aria-label',move.title);move.disabled=index+delta<0||index+delta>=groupOrder.length;move.addEventListener('click',()=>{const other=index+delta;[groupOrder[index],groupOrder[other]]=[groupOrder[other],groupOrder[index]];changed();});chip.append(move);
     }
     chip.addEventListener('dragstart',event=>event.dataTransfer.setData('text/plain',dimension));
     chip.addEventListener('dragover',event=>event.preventDefault());
-    chip.addEventListener('drop',event=>{event.preventDefault();const source=event.dataTransfer.getData('text/plain');if(!groupOrder.includes(source)||source===dimension)return;groupOrder=groupOrder.filter(group=>group!==source);groupOrder.splice(groupOrder.indexOf(dimension),0,source);renderGroupers();renderJournal();});
+    chip.addEventListener('drop',event=>{event.preventDefault();const source=event.dataTransfer.getData('text/plain');if(!groupOrder.includes(source)||source===dimension)return;groupOrder=groupOrder.filter(group=>group!==source);groupOrder.splice(groupOrder.indexOf(dimension),0,source);changed();});
     host.append(chip);
   });
 }

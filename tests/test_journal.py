@@ -294,6 +294,12 @@ class ReportTests(unittest.TestCase):
         config["status_roles"]["reading"]["label"] = "Reading"
         config["default_groupers"] = ["month", "week", "day", "paper"]
         self.assertEqual(journal.validate_config(config)["default_groupers"], ["month", "week", "day", "paper"])
+        config["default_groupers"] = ["timestamp", "paper"]
+        config["grouper_order"] = ["timestamp", "paper", "status", "category", "collection", "day", "week", "month"]
+        self.assertEqual(journal.validate_config(config)["grouper_order"][0], "timestamp")
+        config["grouper_order"] = ["timestamp"]
+        with self.assertRaisesRegex(ValueError, "Grouper order"):
+            journal.validate_config(config)
 
     def test_annotation_modified_after_addition_uses_modification_timestamp(self):
         annotation = next(entry for entry in self.items if entry["key"] == "ANNOT001")
