@@ -245,10 +245,11 @@ function drawPie(pie,multiMembership) {
   const center=document.createElementNS(ns,'text');for(const [key,value] of Object.entries({x:95,y:101,'text-anchor':'middle','font-size':29,'font-family':'Georgia,serif',fill:'#173d39'}))center.setAttribute(key,value);center.textContent=total;svg.append(center);host.append(svg);
 }
 function drawLegend() {
+  const host=$('color-legend');host.replaceChildren();
   data.color_legend.forEach(item=>{
     const row=el('div','color-item'),swatch=el('span','swatch'),copy=el('div');
     if(validColor(item.color))swatch.style.setProperty('--swatch',item.color);
-    copy.append(el('strong','',item.label),el('p','',item.description));row.append(swatch,copy);$('color-legend').append(row);
+    copy.append(el('strong','',item.label),el('p','',item.description));row.append(swatch,copy);host.append(row);
   });
 }
 

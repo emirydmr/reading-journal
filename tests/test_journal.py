@@ -62,6 +62,12 @@ class ApiTests(unittest.TestCase):
 
 
 class ReportTests(unittest.TestCase):
+    def test_annotation_legend_uses_fixed_zotero_palette(self):
+        colors, legend = journal.annotation_color_legend({"annotation_colors": {}})
+        self.assertEqual(colors, {})
+        self.assertEqual([item["color"] for item in legend], list(journal.ZOTERO_ANNOTATION_COLORS))
+        self.assertTrue(all(item["label"] == "Unmapped" for item in legend))
+
     def test_new_colors_migrate_once_and_keep_user_edits(self):
         raw = json.loads((journal.HERE / "config.json").read_text(encoding="utf-8"))
         raw.pop("annotation_color_schema_version")
@@ -151,9 +157,10 @@ class ReportTests(unittest.TestCase):
         app_html = journal.render_html(report, app_config=self.config, app_catalog={})
         self.assertIn("data:image/png;base64,", app_html)
         self.assertNotIn("__ZOTERO_ICON__", app_html)
-        self.assertEqual([entry["color"] for entry in report["color_legend"]], [*journal.ZOTERO_ANNOTATION_COLORS, "#123456"])
+        self.assertEqual([entry["color"] for entry in report["color_legend"]], list(journal.ZOTERO_ANNOTATION_COLORS))
+        self.assertEqual(len(report["color_legend"]), 8)
         self.assertEqual({a["meaning"] for a in report["journal"]},
-                         {entry["label"] for entry in report["color_legend"]})
+                         {entry["label"] for entry in report["color_legend"]} | {"Unmapped"})
         new = next(paper for paper in report["inventory"] if paper["title"] == "New paper")
         self.assertEqual(new["status"], {"label": "Read", "revisit": True})
         self.assertIn("status/read", new["tags"]["Status"])

@@ -43,12 +43,10 @@ if (appConfig) {
   }
   function swatch(hex,label) {const input=el('input','editor-swatch');input.type='color';input.value=validColor(hex)?hex:'#7b9185';input.setAttribute('aria-label',label);return input;}
   const zoteroColors=['#ffd400','#ff6666','#5fb236','#2ea8e5','#a28ae5','#e56eee','#f19837','#aaaaaa'];
-  const colorOrder=color=>{const index=zoteroColors.indexOf(color.toLowerCase());return index<0?zoteroColors.length:index;};
-  function sortColorRows(){const host=$('setting-colors');[...host.children].sort((a,b)=>colorOrder(a.editor.color.value)-colorOrder(b.editor.color.value)||a.editor.color.value.localeCompare(b.editor.color.value)).forEach(row=>host.append(row));}
   function colorRow(hex,meaning) {
-    const row=el('div','editor-grid annotation-setting'),color=swatch(hex,'Annotation color');
+    const row=el('div','editor-grid annotation-setting'),color=el('span','annotation-fixed-swatch');color.style.backgroundColor=hex;color.title=hex;color.setAttribute('aria-label',`Zotero annotation color ${hex}`);
     const [meaningWrap,meaningInput]=field('Meaning',meaning.label),[descriptionWrap,descriptionInput]=field('Description',meaning.description||'');
-    row.append(color,meaningWrap,descriptionWrap,trashButton('Remove annotation color',()=>row.remove()));row.editor={color,meaningInput,descriptionInput};$('setting-colors').append(row);color.addEventListener('change',sortColorRows);sortColorRows();
+    row.append(color,meaningWrap,descriptionWrap);row.editor={hex,meaningInput,descriptionInput};$('setting-colors').append(row);
   }
   function categoryRow(name,rule) {
     const card=el('details','tag-category');const summary=el('summary','tag-category-heading'),dot=el('span','category-dot'),title=el('span','',name);dot.style.background=rule.color;summary.append(dot,title);card.append(summary);
@@ -113,7 +111,7 @@ if (appConfig) {
     fillCollectionTree();
     const types=$('setting-types');types.replaceChildren();
     appCatalog.paper_types.forEach(name=>checkbox(types,name,name.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,letter=>letter.toUpperCase()),(appConfig.paper_types||[]).includes(name)));
-    $('setting-colors').replaceChildren();Object.entries(appConfig.annotation_colors||{}).forEach(([hex,meaning])=>colorRow(hex,typeof meaning==='string'?{label:meaning,description:''}:meaning));
+    $('setting-colors').replaceChildren();zoteroColors.forEach(hex=>{const value=appConfig.annotation_colors?.[hex]||data.color_legend.find(item=>item.color===hex);colorRow(hex,typeof value==='string'?{label:value,description:''}:value||{label:'Unmapped',description:''});});
     $('setting-categories').replaceChildren();Object.entries(appCatalog.tag_categories||{}).forEach(([name,rule])=>categoryRow(name,rule));
   }
   $('app-settings').addEventListener('click',()=>{fillSettings();dialog.showModal();});
@@ -129,7 +127,6 @@ if (appConfig) {
     }catch(error){saveGrouping.textContent=error.message;}
   });
   $('settings-close').addEventListener('click',dismiss);$('settings-cancel').addEventListener('click',dismiss);
-  $('add-color').addEventListener('click',()=>colorRow('#999999',{label:'New meaning',description:''}));
   $('add-category').addEventListener('click',()=>categoryRow('New category',{prefix:'new/',allowed_tags:[],tags:{},color:'#7b9185',selection_mode:'explicit'}));
   let refreshing=false,reportSignature=JSON.stringify([data,appCatalog]);
   async function refreshJournal(){
@@ -155,7 +152,7 @@ if (appConfig) {
     next.included_collections=[...$('setting-collections').querySelectorAll('input:checked')].map(input=>input.value);
     next.paper_types=[...$('setting-types').querySelectorAll('input:checked')].map(input=>input.value);
     next.default_groupers=groupOrder.filter(group=>activeGroupers.has(group));
-    next.annotation_colors={};for(const row of $('setting-colors').children){const edit=row.editor,hex=edit.color.value.toLowerCase();if(next.annotation_colors[hex]){$('settings-error').textContent=`Duplicate annotation color: ${hex}`;return;}next.annotation_colors[hex]={label:edit.meaningInput.value.trim(),description:edit.descriptionInput.value.trim()};}
+    next.annotation_colors={...appConfig.annotation_colors};for(const row of $('setting-colors').children){const edit=row.editor;next.annotation_colors[edit.hex]={label:edit.meaningInput.value.trim(),description:edit.descriptionInput.value.trim()};}
     next.tag_schema_version=2;next.tag_categories={};for(const card of $('setting-categories').children){const edit=card.editor,name=edit.name.value.trim();if(next.tag_categories[name]){$('settings-error').textContent=`Duplicate category: ${name}`;return;}
       const tags={};for(const row of edit.rows.values()){const tag=row.editor,key=tag.key.value.trim();if(tags[key]){$('settings-error').textContent=`Duplicate tag: ${key}`;return;}tags[key]={label:tag.label.value.trim(),color:tag.color.value,description:tag.description.value.trim(),reading_role:tag.role.value};}
       next.tag_categories[name]={prefix:edit.prefix.value.trim(),color:edit.color.value,description:edit.description.value.trim(),selection_mode:edit.future.checked?'prefix':'explicit',allowed_tags:[...edit.selected()].filter(key=>!key.startsWith('@')),tags};}

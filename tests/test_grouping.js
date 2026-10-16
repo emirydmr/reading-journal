@@ -17,6 +17,12 @@ const context = vm.createContext({
   },
 });
 vm.runInContext(setup, context);
+const legendHost={children:[],replaceChildren(){this.children=[];},append(node){this.children.push(node);}};
+context.document.getElementById=id=>id==='color-legend'?legendHost:{addEventListener:()=>{}};
+context.document.createElement=tag=>({tag,children:[],style:{setProperty(){}},append(...nodes){this.children.push(...nodes);}});
+context.data.color_legend=[{color:'#ffd400',label:'Important',description:'Keep'}];
+vm.runInContext('drawLegend();drawLegend()',context);
+assert.equal(legendHost.children.length,1);
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Unassigned',revisit:false}})",context),true);
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Unassigned',revisit:true}})",context),false);
 assert.equal(vm.runInContext("isUnassignedPaper({status:{label:'Read',revisit:true}})",context),false);

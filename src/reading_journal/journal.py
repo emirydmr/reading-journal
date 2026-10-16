@@ -71,11 +71,6 @@ def load_config(path: Path | None = None) -> dict:
     return validate_config(raw)
 
 
-def annotation_color_sort_key(color: str) -> tuple[int, str]:
-    color = color.lower()
-    return (ZOTERO_ANNOTATION_COLORS.index(color) if color in ZOTERO_ANNOTATION_COLORS else len(ZOTERO_ANNOTATION_COLORS), color)
-
-
 def editable_tag_config(raw: dict) -> dict:
     """Migrate legacy mappings for the unified editor without changing saved settings."""
     config = copy.deepcopy(raw)
@@ -369,7 +364,10 @@ def annotation_color_legend(config: dict) -> tuple[dict[str, dict], list[dict]]:
             "label": meaning["label"],
             "description": meaning.get("description", ""),
         }
-    return colors, sorted(colors.values(), key=lambda item: annotation_color_sort_key(item["color"]))
+    legend = [colors.get(color, {"color": color, "label": "Unmapped",
+                                 "description": "No meaning is configured for this annotation color."})
+              for color in ZOTERO_ANNOTATION_COLORS]
+    return colors, legend
 
 
 def is_in_window(value: str | None, tz: ZoneInfo, first: date, last: date) -> bool:
@@ -465,8 +463,6 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
             if event is None:
                 continue
             raw_color = (annotation.get("annotationColor") or "").lower()
-            if raw_color not in colors and not any(item["color"] == raw_color for item in color_legend):
-                color_legend.append({"color": raw_color, "label": "Unmapped", "description": "No meaning is configured for this annotation color."})
             event_type, event_at = event
             added_periods = local_periods(annotation.get("dateAdded"), tz)
             modified_periods = local_periods(annotation.get("dateModified"), tz)
@@ -580,7 +576,7 @@ def build_report(config: dict, first: date, last: date, *, items: list[dict] | N
             {"day": day, "bucket": bucket, "count": count}
             for (day, bucket), count in sorted(size_counts.items())
         ],
-        "color_legend": sorted(color_legend, key=lambda item: annotation_color_sort_key(item["color"])),
+        "color_legend": color_legend,
         "status_roles": config["status_roles"],
         "tag_styles": tag_styles,
         "default_groupers": config["default_groupers"],
